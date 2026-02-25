@@ -99,6 +99,36 @@ output/campaign-2026-02-25T21-41-42/
 | `MAX_CONCURRENT_GENERATORS` | `3` | Parallele Asset-Generierung |
 | `DEFAULT_LANGUAGE` | `de` | Content-Sprache (`de` / `en`) |
 
+## Brand-Konfiguration
+
+Im Ordner `brand/` können Markdown-Dateien hinterlegt werden, die automatisch in alle relevanten Pipeline-Schritte einfließen. Leere Templates (nur Überschriften/Platzhalter) werden ignoriert — die Pipeline funktioniert auch komplett ohne Brand-Dateien.
+
+### Dateien
+
+| Datei | Zweck | Wird verwendet in |
+|-------|-------|-------------------|
+| `brand/identity.md` | Unternehmen, Mission, Werte, Zielgruppen | Textgenerierung + Bildgenerierung |
+| `brand/tone-of-voice.md` | Tonalität, Ansprache, Schreibregeln, Begriffe | Textgenerierung |
+| `brand/visual-identity.md` | Farben, Typografie, Design-Prinzipien | Bildgenerierung |
+| `brand/image-guidelines.md` | Bildstil, Motive, Plattform-Vorgaben | Bildgenerierung |
+| `brand/guidelines.md` | Content-Regeln, Dos/Don'ts, Hashtags, CTAs | Textgenerierung |
+
+### Verwendung
+
+1. Templates ausfüllen — einfach die Platzhalter in den `.md`-Dateien durch echte Inhalte ersetzen
+2. Pipeline starten — Brand-Kontext wird automatisch geladen und an alle Stages übergeben
+3. Eigene Dateien hinzufügen — jede `.md`-Datei im `brand/`-Ordner wird eingelesen und fließt in beide Kontexte (Text + Bild) ein
+
+```bash
+# Anderes Brand-Verzeichnis verwenden
+npx content-creator generate --brand ./mein-brand "..."
+```
+
+### Wie der Brand-Kontext wirkt
+
+- **Textgenerierung** (Brief-Parsing, Planung, Asset-Generierung, Review): Brand-Kontext wird als Guideline an den System-Prompt angehängt — Claude berücksichtigt Tonalität, Begriffe und Regeln
+- **Bildgenerierung** (Gemini): Visueller Kontext (Farben, Bildstil, Motive) wird an die Image-Prompts angehängt
+
 ## Neuen Asset-Typ hinzufügen
 
 1. Typ in `AssetTypeEnum` ergänzen (`src/pipeline/types.ts`)

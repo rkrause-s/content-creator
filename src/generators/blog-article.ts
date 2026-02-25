@@ -1,4 +1,4 @@
-import { AssetGenerator, type GeneratorOptions } from "./base.js";
+import { AssetGenerator, withBrandContext, type GeneratorOptions } from "./base.js";
 import type { AssetType, GeneratedAsset, PlannedAsset } from "../pipeline/types.js";
 import { generateText } from "../claude/client.js";
 import { BLOG_SYSTEM, blogPrompt } from "../prompts/assets/blog.js";
@@ -10,7 +10,7 @@ export class BlogArticleGenerator extends AssetGenerator {
 
   async generate(asset: PlannedAsset, options: GeneratorOptions): Promise<GeneratedAsset> {
     const content = await generateText({
-      system: BLOG_SYSTEM,
+      system: withBrandContext(BLOG_SYSTEM, options.brandContext),
       prompt: blogPrompt({
         title: asset.title,
         angle: asset.angle,

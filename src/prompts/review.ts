@@ -20,7 +20,8 @@ Provide an overall campaign score too.`;
 export function reviewPrompt(
   brief: CampaignBrief,
   plan: ContentPlan,
-  assets: GeneratedAsset[]
+  assets: GeneratedAsset[],
+  brandContext?: string
 ): string {
   const assetTexts = assets
     .map(
@@ -42,5 +43,5 @@ ${plan.brandVoiceGuidelines}
 
 ## Assets to Review
 
-${assetTexts}`;
+${assetTexts}${brandContext ? `\n\n---\n\n## Brand Guidelines (check compliance)\n\n${brandContext}` : ""}`;
 }

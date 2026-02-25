@@ -1,4 +1,4 @@
-import { AssetGenerator, type GeneratorOptions } from "./base.js";
+import { AssetGenerator, withBrandContext, type GeneratorOptions } from "./base.js";
 import type { AssetType, GeneratedAsset, PlannedAsset } from "../pipeline/types.js";
 import { generateText } from "../claude/client.js";
 import { WHITEPAPER_SYSTEM, whitepaperPrompt } from "../prompts/assets/whitepaper.js";
@@ -10,7 +10,7 @@ export class WhitepaperGenerator extends AssetGenerator {
 
   async generate(asset: PlannedAsset, options: GeneratorOptions): Promise<GeneratedAsset> {
     const content = await generateText({
-      system: WHITEPAPER_SYSTEM,
+      system: withBrandContext(WHITEPAPER_SYSTEM, options.brandContext),
       prompt: whitepaperPrompt({
         title: asset.title,
         angle: asset.angle,

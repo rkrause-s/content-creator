@@ -11,8 +11,8 @@ Your plan should:
 
 Asset IDs should follow the pattern: {type}-{number}, e.g. "linkedin-post-01", "blog-article-01"`;
 
-export function contentPlanningPrompt(brief: CampaignBrief): string {
-  return `Create a content plan for this campaign:
+export function contentPlanningPrompt(brief: CampaignBrief, brandContext?: string): string {
+  let prompt = `Create a content plan for this campaign:
 
 Topic: ${brief.topic}
 Target Audience: ${brief.targetAudience}
@@ -24,4 +24,8 @@ ${brief.constraints?.length ? `Constraints: ${brief.constraints.join("; ")}` : "
 
 Requested Assets:
 ${brief.requestedAssets.map((a) => `- ${a.count}x ${a.type}${a.notes ? ` (${a.notes})` : ""}`).join("\n")}`;
+  if (brandContext) {
+    prompt += `\n\n---\n\nBrand Guidelines (must be reflected in brand voice guidelines, tone, and content pillars):\n\n${brandContext}`;
+  }
+  return prompt;
 }

@@ -1,4 +1,4 @@
-import { AssetGenerator, type GeneratorOptions } from "./base.js";
+import { AssetGenerator, withBrandContext, type GeneratorOptions } from "./base.js";
 import type { AssetType, GeneratedAsset, PlannedAsset } from "../pipeline/types.js";
 import { generateText } from "../claude/client.js";
 import { LINKEDIN_SYSTEM, linkedinPrompt } from "../prompts/assets/linkedin.js";
@@ -10,7 +10,7 @@ export class LinkedInPostGenerator extends AssetGenerator {
 
   async generate(asset: PlannedAsset, options: GeneratorOptions): Promise<GeneratedAsset> {
     const content = await generateText({
-      system: LINKEDIN_SYSTEM,
+      system: withBrandContext(LINKEDIN_SYSTEM, options.brandContext),
       prompt: linkedinPrompt({
         title: asset.title,
         angle: asset.angle,

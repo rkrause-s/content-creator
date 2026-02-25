@@ -9,6 +9,7 @@ import { exportCampaign } from "./stages/export.js";
 import { generateImages } from "./stages/generate-images.js";
 import { generatePdfs } from "./stages/generate-pdfs.js";
 import { config } from "../config.js";
+import { loadBrandConfig } from "../brand/loader.js";
 
 export interface RunOptions {
   language: string;
@@ -24,10 +25,18 @@ export async function runPipeline(userPrompt: string, options: RunOptions): Prom
     outputDir: options.outputDir,
   };
 
+  // Load brand configuration
+  const brand = await loadBrandConfig();
+  if (brand.loaded) {
+    state.brandTextContext = brand.textContext;
+    state.brandImageContext = brand.imageContext;
+    console.log(chalk.dim(`  Brand config loaded (${Object.keys(brand.files).join(", ")})`));
+  }
+
   // Stage 1: Parse Brief
   let spinner = ora("Parsing campaign brief...").start();
   try {
-    state.brief = await parseBrief(userPrompt, options.language);
+    state.brief = await parseBrief(userPrompt, options.language, state.brandTextContext);
     spinner.succeed(
       `Brief parsed: ${chalk.bold(state.brief.topic)} → ${state.brief.requestedAssets.map((a) => `${a.count}x ${a.type}`).join(", ")}`
     );
@@ -39,7 +48,7 @@ export async function runPipeline(userPrompt: string, options: RunOptions): Prom
   // Stage 2: Plan Content
   spinner = ora("Creating content plan...").start();
   try {
-    state.plan = await planContent(state.brief);
+    state.plan = await planContent(state.brief, state.brandTextContext);
     spinner.succeed(
       `Content plan ready: ${chalk.bold(state.plan.campaignName)} (${state.plan.assets.length} assets planned)`
     );
@@ -55,7 +64,7 @@ export async function runPipeline(userPrompt: string, options: RunOptions): Prom
   // Stage 3: Generate Assets (text content)
   spinner = ora(`Generating ${state.plan.assets.length} assets...`).start();
   try {
-    state.assets = await generateAssets(state.plan, state.language);
+    state.assets = await generateAssets(state.plan, state.language, state.brandTextContext);
     spinner.succeed(`${state.assets.length} assets generated`);
   } catch (err) {
     spinner.fail("Failed to generate assets");
@@ -65,7 +74,7 @@ export async function runPipeline(userPrompt: string, options: RunOptions): Prom
   // Stage 4: Review
   spinner = ora("Reviewing assets for quality and consistency...").start();
   try {
-    const { review, revisedAssets } = await reviewAssets(state.brief, state.plan, state.assets);
+    const { review, revisedAssets } = await reviewAssets(state.brief, state.plan, state.assets, state.brandTextContext);
     state.review = review;
     state.assets = revisedAssets;
     const revised = review.assetReviews.filter((r) => r.score < 7).length;
@@ -93,7 +102,7 @@ export async function runPipeline(userPrompt: string, options: RunOptions): Prom
   if (!options.skipImages && hasGeminiKey) {
     spinner = ora(`Generating images for ${state.assets.length} assets...`).start();
     try {
-      state.assets = await generateImages(state.assets, state.brief, state.outputDir!);
+      state.assets = await generateImages(state.assets, state.brief, state.outputDir!, state.brandImageContext);
       const imageCount = state.assets.filter((a) => a.imagePath).length;
       spinner.succeed(`${imageCount} images generated`);
     } catch (err) {

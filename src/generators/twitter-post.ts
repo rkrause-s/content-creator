@@ -1,4 +1,4 @@
-import { AssetGenerator, type GeneratorOptions } from "./base.js";
+import { AssetGenerator, withBrandContext, type GeneratorOptions } from "./base.js";
 import type { AssetType, GeneratedAsset, PlannedAsset } from "../pipeline/types.js";
 import { generateText } from "../claude/client.js";
 import { TWITTER_SYSTEM, twitterPrompt } from "../prompts/assets/twitter.js";
@@ -10,7 +10,7 @@ export class TwitterPostGenerator extends AssetGenerator {
 
   async generate(asset: PlannedAsset, options: GeneratorOptions): Promise<GeneratedAsset> {
     const content = await generateText({
-      system: TWITTER_SYSTEM,
+      system: withBrandContext(TWITTER_SYSTEM, options.brandContext),
       prompt: twitterPrompt({
         title: asset.title,
         angle: asset.angle,

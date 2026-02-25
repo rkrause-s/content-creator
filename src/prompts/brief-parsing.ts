@@ -23,6 +23,10 @@ Map asset mentions to these exact types:
 - Instagram/Insta → "instagram-caption"
 - Whitepaper/White Paper/PDF → "whitepaper"`;
 
-export function briefParsingPrompt(userInput: string): string {
-  return `Parse this campaign brief into structured data:\n\n${userInput}`;
+export function briefParsingPrompt(userInput: string, brandContext?: string): string {
+  let prompt = `Parse this campaign brief into structured data:\n\n${userInput}`;
+  if (brandContext) {
+    prompt += `\n\n---\n\nUse the following brand information to inform defaults for tone, target audience, and constraints:\n\n${brandContext}`;
+  }
+  return prompt;
 }

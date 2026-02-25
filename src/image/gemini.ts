@@ -57,6 +57,7 @@ export function buildImagePrompt(options: {
   title: string;
   topic: string;
   tone: string;
+  brandImageContext?: string;
 }): string {
   const styleMap: Record<string, string> = {
     "blog-article":
@@ -81,5 +82,5 @@ Topic: ${options.title}
 Theme: ${options.topic}
 Mood: ${options.tone}
 
-The image should feel professional and be suitable for a B2B technology company. Use a cohesive color palette (blues, purples, teals). Photorealistic or high-quality illustration style.`;
+The image should feel professional and be suitable for a B2B technology company. Use a cohesive color palette (blues, purples, teals). Photorealistic or high-quality illustration style.${options.brandImageContext ? `\n\nBrand visual guidelines (follow these closely):\n${options.brandImageContext}` : ""}`;
 }

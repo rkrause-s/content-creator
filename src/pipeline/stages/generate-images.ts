@@ -6,7 +6,8 @@ import { config } from "../../config.js";
 export async function generateImages(
   assets: GeneratedAsset[],
   brief: CampaignBrief,
-  outputDir: string
+  outputDir: string,
+  brandImageContext?: string
 ): Promise<GeneratedAsset[]> {
   const imagesDir = path.join(outputDir, "images");
   const concurrency = config.maxConcurrent;
@@ -23,6 +24,7 @@ export async function generateImages(
             title: asset.title,
             topic: brief.topic,
             tone: brief.tone,
+            brandImageContext,
           });
 
           const imagePath = await generateImage({

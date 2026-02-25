@@ -11,11 +11,12 @@ import { REVIEW_SYSTEM, reviewPrompt } from "../../prompts/review.js";
 export async function reviewAssets(
   brief: CampaignBrief,
   plan: ContentPlan,
-  assets: GeneratedAsset[]
+  assets: GeneratedAsset[],
+  brandContext?: string
 ): Promise<{ review: ReviewResult; revisedAssets: GeneratedAsset[] }> {
   const review = await generateStructured({
     system: REVIEW_SYSTEM,
-    prompt: reviewPrompt(brief, plan, assets),
+    prompt: reviewPrompt(brief, plan, assets, brandContext),
     schema: ReviewResultSchema,
     schemaName: "ReviewResult",
   });
@@ -29,8 +30,9 @@ export async function reviewAssets(
     if (idx === -1) continue;
 
     const original = revisedAssets[idx];
+    const brandNote = brandContext ? `\n\nBrand guidelines to follow:\n${brandContext}` : "";
     const revisedContent = await generateText({
-      system: `You are revising a marketing asset based on editorial feedback. Maintain the same format and structure but address the issues.`,
+      system: `You are revising a marketing asset based on editorial feedback. Maintain the same format and structure but address the issues.${brandNote}`,
       prompt: `Original ${original.type} asset:\n\n${original.content}\n\nIssues to fix:\n${rev.issues.map((i) => `- ${i}`).join("\n")}\n\nSuggestions:\n${rev.suggestions.map((s) => `- ${s}`).join("\n")}\n\nWrite the revised version:`,
       maxTokens: 8192,
     });

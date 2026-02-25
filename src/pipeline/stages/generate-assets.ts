@@ -4,7 +4,8 @@ import { config } from "../../config.js";
 
 export async function generateAssets(
   plan: ContentPlan,
-  language: string
+  language: string,
+  brandContext?: string
 ): Promise<GeneratedAsset[]> {
   const assets: GeneratedAsset[] = [];
   const queue = [...plan.assets];
@@ -19,6 +20,7 @@ export async function generateAssets(
         return generator.generate(planned, {
           brandVoice: plan.brandVoiceGuidelines,
           language,
+          brandContext,
         });
       })
     );

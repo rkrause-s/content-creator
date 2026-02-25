@@ -2,10 +2,10 @@ import { generateStructured } from "../../claude/client.js";
 import { CampaignBriefSchema, type CampaignBrief } from "../types.js";
 import { BRIEF_PARSING_SYSTEM, briefParsingPrompt } from "../../prompts/brief-parsing.js";
 
-export async function parseBrief(userPrompt: string, language: string): Promise<CampaignBrief> {
+export async function parseBrief(userPrompt: string, language: string, brandContext?: string): Promise<CampaignBrief> {
   const brief = await generateStructured({
     system: BRIEF_PARSING_SYSTEM,
-    prompt: briefParsingPrompt(userPrompt),
+    prompt: briefParsingPrompt(userPrompt, brandContext),
     schema: CampaignBriefSchema,
     schemaName: "CampaignBrief",
   });

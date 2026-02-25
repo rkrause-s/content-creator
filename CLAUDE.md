@@ -50,6 +50,15 @@ Each asset type is an `AssetGenerator` subclass (`src/generators/base.ts`) with 
 - `src/export/pdf.ts` — Puppeteer renders a Handlebars HTML template to A4 PDF with cover page, typography, page numbers
 - `src/export/campaign-bundle.ts` — writes `campaign.json`, `content-plan.json`, `README.md`
 
+### Brand configuration
+
+`src/brand/loader.ts` reads all `.md` files from `brand/`, skips empty templates via `isEmptyTemplate()`, and builds two context strings:
+
+- **textContext** — assembled from `identity`, `tone-of-voice`, `guidelines` (in that order), plus any extra files. Injected into system prompts via `withBrandContext()` (`src/generators/base.ts`) and passed as parameter to brief-parsing, content-planning, and review prompts.
+- **imageContext** — assembled from `visual-identity`, `image-guidelines`, `identity` (in that order), plus extras. Appended to Gemini image prompts in `src/image/gemini.ts`.
+
+The runner (`src/pipeline/runner.ts`) calls `loadBrandConfig()` at startup and stores both contexts in `PipelineState.brandTextContext` / `brandImageContext`.
+
 ## Key conventions
 
 - ESM throughout (`"type": "module"` in package.json) — all imports use `.js` extensions

@@ -97,6 +97,8 @@ export type ReviewResult = z.infer<typeof ReviewResultSchema>;
 export interface PipelineState {
   userPrompt: string;
   language: string;
+  brandTextContext?: string;
+  brandImageContext?: string;
   brief?: CampaignBrief;
   plan?: ContentPlan;
   assets?: GeneratedAsset[];
