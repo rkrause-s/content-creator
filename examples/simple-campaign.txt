@@ -1,0 +1,7 @@
+Kampagne über unser neues Confluence Plugin "Smart Templates" für IT-Teams und Projektmanager.
+
+Das Plugin ermöglicht es, dynamische Vorlagen in Confluence zu erstellen, die sich automatisch an den Kontext anpassen. Hauptvorteile: Zeitersparnis bei der Dokumentation, konsistente Projekt-Dokumentation, automatische Verlinkung.
+
+Zielgruppe: IT-Projektleiter und DevOps-Teams in mittelständischen Unternehmen.
+
+Gewünschte Assets: 3 LinkedIn Posts, 1 Blog-Artikel, 1 Newsletter-Email.
