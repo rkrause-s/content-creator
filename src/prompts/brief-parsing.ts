@@ -20,7 +20,8 @@ Map asset mentions to these exact types:
 - Twitter/Tweet/X → "twitter-post"
 - Blog/Blog Post/Artikel → "blog-article"
 - Email/Newsletter → "email-newsletter"
-- Instagram/Insta → "instagram-caption"`;
+- Instagram/Insta → "instagram-caption"
+- Whitepaper/White Paper/PDF → "whitepaper"`;
 
 export function briefParsingPrompt(userInput: string): string {
   return `Parse this campaign brief into structured data:\n\n${userInput}`;

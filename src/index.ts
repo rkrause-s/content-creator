@@ -19,13 +19,15 @@ program
   .argument("<prompt>", "Campaign brief as free text")
   .option("-l, --language <lang>", "Content language (de/en)", config.defaultLanguage)
   .option("-o, --output <dir>", "Output directory", "output")
-  .action(async (prompt: string, opts: { language: string; output: string }) => {
+  .option("--skip-images", "Skip image generation via Gemini")
+  .action(async (prompt: string, opts: { language: string; output: string; skipImages?: boolean }) => {
     try {
       validateConfig();
       console.log(chalk.bold("\n🚀 Content Creator Pipeline\n"));
       const state = await runPipeline(prompt, {
         language: opts.language,
         outputDir: opts.output,
+        skipImages: opts.skipImages,
       });
       console.log(
         chalk.green(

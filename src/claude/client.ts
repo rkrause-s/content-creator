@@ -6,7 +6,9 @@ let client: Anthropic | null = null;
 
 function getClient(): Anthropic {
   if (!client) {
-    client = new Anthropic({ apiKey: config.anthropicApiKey });
+    client = config.anthropicApiKey
+      ? new Anthropic({ apiKey: config.anthropicApiKey })
+      : new Anthropic();
   }
   return client;
 }

@@ -6,11 +6,15 @@ import { planContent } from "./stages/plan-content.js";
 import { generateAssets } from "./stages/generate-assets.js";
 import { reviewAssets } from "./stages/review.js";
 import { exportCampaign } from "./stages/export.js";
+import { generateImages } from "./stages/generate-images.js";
+import { generatePdfs } from "./stages/generate-pdfs.js";
+import { config } from "../config.js";
 
 export interface RunOptions {
   language: string;
   outputDir?: string;
   planOnly?: boolean;
+  skipImages?: boolean;
 }
 
 export async function runPipeline(userPrompt: string, options: RunOptions): Promise<PipelineState> {
@@ -48,7 +52,7 @@ export async function runPipeline(userPrompt: string, options: RunOptions): Prom
     return state;
   }
 
-  // Stage 3: Generate Assets
+  // Stage 3: Generate Assets (text content)
   spinner = ora(`Generating ${state.plan.assets.length} assets...`).start();
   try {
     state.assets = await generateAssets(state.plan, state.language);
@@ -73,7 +77,7 @@ export async function runPipeline(userPrompt: string, options: RunOptions): Prom
     throw err;
   }
 
-  // Stage 5: Export
+  // Stage 5: Export (creates output directory)
   spinner = ora("Exporting campaign...").start();
   try {
     const outputDir = await exportCampaign(state);
@@ -82,6 +86,40 @@ export async function runPipeline(userPrompt: string, options: RunOptions): Prom
   } catch (err) {
     spinner.fail("Failed to export campaign");
     throw err;
+  }
+
+  // Stage 6: Generate Images (Gemini)
+  const hasGeminiKey = config.geminiApiKey || process.env.GEMINI_API_KEY;
+  if (!options.skipImages && hasGeminiKey) {
+    spinner = ora(`Generating images for ${state.assets.length} assets...`).start();
+    try {
+      state.assets = await generateImages(state.assets, state.brief, state.outputDir!);
+      const imageCount = state.assets.filter((a) => a.imagePath).length;
+      spinner.succeed(`${imageCount} images generated`);
+    } catch (err) {
+      spinner.fail("Image generation failed (continuing without images)");
+    }
+  } else if (!options.skipImages && !hasGeminiKey) {
+    console.log(chalk.dim("  Skipping image generation (no GEMINI_API_KEY set)"));
+  }
+
+  // Stage 7: Generate PDFs (whitepapers)
+  const hasWhitepapers = state.assets.some((a) => a.type === "whitepaper");
+  if (hasWhitepapers) {
+    spinner = ora("Generating whitepaper PDFs...").start();
+    try {
+      state.assets = await generatePdfs(state.assets, state.outputDir!, state.language);
+      const pdfCount = state.assets.filter((a) => a.pdfPath).length;
+      spinner.succeed(`${pdfCount} PDF(s) generated`);
+    } catch (err) {
+      spinner.fail("PDF generation failed (continuing without PDFs)");
+    }
+  }
+
+  // Re-export HTML preview with image paths and PDF links
+  if (state.assets.some((a) => a.imagePath || a.pdfPath)) {
+    const { exportHtmlPreview } = await import("../export/html-preview.js");
+    await exportHtmlPreview(state.outputDir!, state);
   }
 
   return state;

@@ -10,6 +10,8 @@ export async function exportCampaign(state: PipelineState): Promise<string> {
   const outputDir = path.resolve(state.outputDir ?? "output", `campaign-${timestamp}`);
 
   await fs.mkdir(path.join(outputDir, "assets"), { recursive: true });
+  await fs.mkdir(path.join(outputDir, "assets", "whitepaper"), { recursive: true });
+  await fs.mkdir(path.join(outputDir, "images"), { recursive: true });
   await fs.mkdir(path.join(outputDir, "preview"), { recursive: true });
 
   // Export markdown files for each asset

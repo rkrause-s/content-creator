@@ -7,12 +7,13 @@ export const config = {
   model: process.env.CLAUDE_MODEL ?? "claude-sonnet-4-20250514",
   maxConcurrent: parseInt(process.env.MAX_CONCURRENT_GENERATORS ?? "3", 10),
   defaultLanguage: process.env.DEFAULT_LANGUAGE ?? "de",
+  geminiApiKey: process.env.GEMINI_API_KEY ?? "",
 };
 
 export function validateConfig(): void {
-  if (!config.anthropicApiKey) {
+  if (!config.anthropicApiKey && !process.env.ANTHROPIC_API_KEY) {
     throw new Error(
-      "ANTHROPIC_API_KEY is not set. Copy .env.example to .env and add your key."
+      "ANTHROPIC_API_KEY is not set. Copy .env.example to .env and add your key, or set it as an environment variable."
     );
   }
 }

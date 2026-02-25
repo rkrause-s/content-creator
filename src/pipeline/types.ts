@@ -8,6 +8,7 @@ export const AssetTypeEnum = z.enum([
   "blog-article",
   "email-newsletter",
   "instagram-caption",
+  "whitepaper",
 ]);
 
 export type AssetType = z.infer<typeof AssetTypeEnum>;
@@ -68,6 +69,8 @@ export interface GeneratedAsset {
   title: string;
   content: string;
   metadata: Record<string, string>;
+  imagePath?: string;
+  pdfPath?: string;
 }
 
 // --- Stage 4: Review ---
