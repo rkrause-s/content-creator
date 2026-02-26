@@ -1,0 +1,105 @@
+{
+  "name": "Content Creator: Publish",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "publish",
+        "responseMode": "onReceived",
+        "responseData": "allEntries"
+      },
+      "id": "webhook-publish",
+      "name": "Webhook: Publish",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SEATABLE_BASE_URL }}/api/v1/dtables/{{ $env.SEATABLE_DTABLE_UUID }}/sql/",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ sql: `SELECT * FROM Campaigns WHERE _id='${$json.body.campaignRowId}' LIMIT 1` }) }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "read-campaign",
+      "name": "SeaTable: Read Campaign",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SEATABLE_BASE_URL }}/api/v1/dtables/{{ $env.SEATABLE_DTABLE_UUID }}/sql/",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ sql: `SELECT * FROM Assets WHERE _id IN (${$('Webhook: Publish').item.json.body.assetRowIds.map(id => \"'\" + id + \"'\").join(',')})` }) }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "read-assets",
+      "name": "SeaTable: Read Assets",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [420, 500]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.API_BASE_URL }}/publish",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ assets: $('SeaTable: Read Assets').item.json.results.map(a => ({ id: a['Asset ID'], type: a.Type, title: a.Title, content: a.Content, metadata: JSON.parse(a.Metadata || '{}') })), campaignName: $('SeaTable: Read Campaign').item.json.results[0].Name }) }}",
+        "options": { "timeout": 300000 }
+      },
+      "id": "publish-to-repo",
+      "name": "Publish to Repo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, 400]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $env.SEATABLE_BASE_URL }}/api/v1/dtables/{{ $env.SEATABLE_DTABLE_UUID }}/batch-update-rows/",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ table_name: 'Assets', updates: $json.published.map(p => ({ row_id: $('Webhook: Publish').item.json.body.assetRowIds.find((id, i) => $('SeaTable: Read Assets').item.json.results[i]?.['Asset ID'] === p.assetId) || '', row: { Status: 'published', 'Publish URL': p.url } })) }) }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "update-assets-published",
+      "name": "SeaTable: Update Published",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [920, 400]
+    }
+  ],
+  "connections": {
+    "Webhook: Publish": {
+      "main": [
+        [
+          { "node": "SeaTable: Read Campaign", "type": "main", "index": 0 },
+          { "node": "SeaTable: Read Assets", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "SeaTable: Read Campaign": {
+      "main": [[{ "node": "Publish to Repo", "type": "main", "index": 0 }]]
+    },
+    "SeaTable: Read Assets": {
+      "main": [[{ "node": "Publish to Repo", "type": "main", "index": 0 }]]
+    },
+    "Publish to Repo": {
+      "main": [[{ "node": "SeaTable: Update Published", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [{ "name": "content-creator" }],
+  "notes": "Publish Workflow: Reads campaign + selected assets from SeaTable, calls API /publish, updates status to published."
+}

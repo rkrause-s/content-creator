@@ -1,0 +1,43 @@
+---
+import StatusBadge from "./StatusBadge.astro";
+import type { AssetRow } from "../lib/seatable";
+
+interface Props {
+  asset: AssetRow;
+}
+
+const { asset } = Astro.props;
+const score = asset["Review Score"];
+
+function scoreClass(s: number): string {
+  if (s >= 8) return "score-high";
+  if (s >= 6) return "score-mid";
+  return "score-low";
+}
+---
+
+<a href={`/assets/${asset._id}`} class="asset-card card" style="text-decoration: none; color: inherit; display: block;">
+  <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+    <div>
+      <div style="font-size: 0.75rem; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem;">
+        {asset.Type}
+      </div>
+      <strong>{asset.Title}</strong>
+    </div>
+    <div style="display: flex; gap: 0.5rem; align-items: center;">
+      {score ? (
+        <span class={`score ${scoreClass(score)}`}>{score}/10</span>
+      ) : null}
+      <StatusBadge status={asset.Status} />
+    </div>
+  </div>
+  {asset.Angle ? (
+    <p style="font-size: 0.85rem; color: var(--color-text-muted); margin-top: 0.25rem;">{asset.Angle}</p>
+  ) : null}
+</a>
+
+<style>
+  .asset-card:hover {
+    border-color: var(--color-primary);
+  }
+</style>

@@ -1,0 +1,129 @@
+---
+import Base from "../../layouts/Base.astro";
+import StatusBadge from "../../components/StatusBadge.astro";
+import AssetCard from "../../components/AssetCard.astro";
+import StatusPoller from "../../components/StatusPoller";
+import { getCampaign, getCampaignAssets } from "../../lib/seatable";
+
+const { id } = Astro.params;
+const campaign = await getCampaign(id!);
+
+if (!campaign) {
+  return Astro.redirect("/");
+}
+
+const assets = await getCampaignAssets(id!);
+const isRunning = ["parsing", "planning", "generating", "reviewing", "images"].includes(campaign.Status?.toLowerCase());
+
+function scoreClass(score: number): string {
+  if (score >= 8) return "score-high";
+  if (score >= 6) return "score-mid";
+  return "score-low";
+}
+
+let pillars: { name: string; description: string }[] = [];
+try {
+  pillars = JSON.parse(campaign.Pillars || "[]");
+} catch { /* ignore */ }
+
+let goals: string[] = [];
+try {
+  goals = JSON.parse(campaign.Goals || "[]");
+} catch { /* ignore */ }
+---
+
+<Base title={campaign.Name || "Kampagne"}>
+  <div style="margin-bottom: 1.5rem;">
+    <a href="/" style="color: var(--color-text-muted); text-decoration: none; font-size: 0.85rem;">&larr; Alle Kampagnen</a>
+  </div>
+
+  <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1.5rem;">
+    <div>
+      <h1 style="font-size: 1.5rem; margin-bottom: 0.5rem;">{campaign.Name || "Kampagne wird erstellt..."}</h1>
+      <div style="display: flex; gap: 0.75rem; align-items: center;">
+        <StatusBadge status={campaign.Status} />
+        {campaign["Overall Score"] ? (
+          <span class={`score ${scoreClass(campaign["Overall Score"])}`}>
+            Score: {campaign["Overall Score"]}/10
+          </span>
+        ) : null}
+        <span style="font-size: 0.85rem; color: var(--color-text-muted);">
+          {campaign.Language?.toUpperCase()} &middot; {new Date(campaign._ctime).toLocaleDateString("de-DE")}
+        </span>
+      </div>
+    </div>
+  </div>
+
+  {isRunning ? (
+    <StatusPoller campaignId={id!} client:load />
+  ) : null}
+
+  {campaign.Error ? (
+    <div class="card" style="border-color: var(--color-error); background: #fff5f5; margin-bottom: 1.5rem;">
+      <strong style="color: var(--color-error);">Fehler</strong>
+      <p style="margin-top: 0.5rem; font-size: 0.9rem;">{campaign.Error}</p>
+    </div>
+  ) : null}
+
+  <!-- Brief info -->
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="card">
+      <h3 style="font-size: 0.9rem; color: var(--color-text-muted); margin-bottom: 0.5rem;">Thema</h3>
+      <p>{campaign.Topic || "—"}</p>
+    </div>
+    <div class="card">
+      <h3 style="font-size: 0.9rem; color: var(--color-text-muted); margin-bottom: 0.5rem;">Zielgruppe</h3>
+      <p>{campaign["Target Audience"] || "—"}</p>
+    </div>
+  </div>
+
+  {goals.length > 0 ? (
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <h3 style="font-size: 0.9rem; color: var(--color-text-muted); margin-bottom: 0.5rem;">Ziele</h3>
+      <ul style="padding-left: 1.25rem;">
+        {goals.map((g) => <li>{g}</li>)}
+      </ul>
+    </div>
+  ) : null}
+
+  {pillars.length > 0 ? (
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <h3 style="font-size: 0.9rem; color: var(--color-text-muted); margin-bottom: 0.75rem;">Content-Säulen</h3>
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 0.75rem;">
+        {pillars.map((p) => (
+          <div style="border: 1px solid var(--color-border); border-radius: 6px; padding: 0.75rem;">
+            <strong style="font-size: 0.9rem;">{p.name}</strong>
+            <p style="font-size: 0.85rem; color: var(--color-text-muted); margin-top: 0.25rem;">{p.description}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  ) : null}
+
+  {campaign["Consistency Notes"] ? (
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <h3 style="font-size: 0.9rem; color: var(--color-text-muted); margin-bottom: 0.5rem;">Review-Notizen</h3>
+      <p style="font-size: 0.9rem;">{campaign["Consistency Notes"]}</p>
+    </div>
+  ) : null}
+
+  <!-- Assets -->
+  <h2 style="font-size: 1.2rem; margin-bottom: 1rem;">Assets ({assets.length})</h2>
+  {assets.length > 0 ? (
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 1rem;">
+      {assets.map((a) => <AssetCard asset={a} />)}
+    </div>
+  ) : (
+    <p style="color: var(--color-text-muted);">Noch keine Assets generiert.</p>
+  )}
+
+  <!-- Prompt -->
+  {campaign.Prompt ? (
+    <details style="margin-top: 2rem;">
+      <summary style="cursor: pointer; color: var(--color-text-muted); font-size: 0.9rem;">Original-Prompt anzeigen</summary>
+      <div class="card" style="margin-top: 0.5rem;">
+        <pre style="white-space: pre-wrap; font-size: 0.85rem;">{campaign.Prompt}</pre>
+      </div>
+    </details>
+  ) : null}
+</Base>

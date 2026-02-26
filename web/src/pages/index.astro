@@ -1,0 +1,62 @@
+---
+import Base from "../layouts/Base.astro";
+import StatusBadge from "../components/StatusBadge.astro";
+import { listCampaigns } from "../lib/seatable";
+
+const campaigns = await listCampaigns();
+
+function scoreClass(score: number): string {
+  if (score >= 8) return "score-high";
+  if (score >= 6) return "score-mid";
+  return "score-low";
+}
+---
+
+<Base title="Kampagnen">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+    <h1 style="font-size: 1.5rem;">Kampagnen</h1>
+    <a href="/campaigns/new" class="btn btn-primary">Neue Kampagne</a>
+  </div>
+
+  {campaigns.length === 0 ? (
+    <div class="card" style="text-align: center; padding: 3rem;">
+      <p style="color: var(--color-text-muted);">Noch keine Kampagnen vorhanden.</p>
+      <a href="/campaigns/new" class="btn btn-primary" style="margin-top: 1rem;">Erste Kampagne erstellen</a>
+    </div>
+  ) : (
+    <div class="card" style="padding: 0; overflow: hidden;">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Status</th>
+            <th>Thema</th>
+            <th>Sprache</th>
+            <th>Score</th>
+            <th>Erstellt</th>
+          </tr>
+        </thead>
+        <tbody>
+          {campaigns.map((c) => (
+            <tr style="cursor: pointer;" onclick={`window.location='/campaigns/${c._id}'`}>
+              <td><strong>{c.Name || "—"}</strong></td>
+              <td><StatusBadge status={c.Status} /></td>
+              <td>{c.Topic || "—"}</td>
+              <td>{c.Language?.toUpperCase() || "—"}</td>
+              <td>
+                {c["Overall Score"] ? (
+                  <span class={`score ${scoreClass(c["Overall Score"])}`}>
+                    {c["Overall Score"]}/10
+                  </span>
+                ) : "—"}
+              </td>
+              <td style="font-size: 0.85rem; color: var(--color-text-muted);">
+                {new Date(c._ctime).toLocaleDateString("de-DE")}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )}
+</Base>

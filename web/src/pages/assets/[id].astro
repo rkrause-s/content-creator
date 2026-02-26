@@ -1,0 +1,158 @@
+---
+import Base from "../../layouts/Base.astro";
+import StatusBadge from "../../components/StatusBadge.astro";
+import { getAsset } from "../../lib/seatable";
+import { markdownToHtml } from "../../lib/markdown";
+
+const { id } = Astro.params;
+const asset = await getAsset(id!);
+
+if (!asset) {
+  return Astro.redirect("/");
+}
+
+function scoreClass(score: number): string {
+  if (score >= 8) return "score-high";
+  if (score >= 6) return "score-mid";
+  return "score-low";
+}
+
+let keyPoints: string[] = [];
+try { keyPoints = JSON.parse(asset["Key Points"] || "[]"); } catch { /* ignore */ }
+
+let strengths: string[] = [];
+try { strengths = JSON.parse(asset["Review Strengths"] || "[]"); } catch { /* ignore */ }
+
+let issues: string[] = [];
+try { issues = JSON.parse(asset["Review Issues"] || "[]"); } catch { /* ignore */ }
+
+let suggestions: string[] = [];
+try { suggestions = JSON.parse(asset["Review Suggestions"] || "[]"); } catch { /* ignore */ }
+---
+
+<Base title={asset.Title}>
+  <div style="margin-bottom: 1.5rem;">
+    <a href="javascript:history.back()" style="color: var(--color-text-muted); text-decoration: none; font-size: 0.85rem;">&larr; Zurück</a>
+  </div>
+
+  <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1.5rem;">
+    <div>
+      <div style="font-size: 0.8rem; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem;">
+        {asset.Type} &middot; {asset["Asset ID"]}
+      </div>
+      <h1 style="font-size: 1.5rem; margin-bottom: 0.5rem;">{asset.Title}</h1>
+      <div style="display: flex; gap: 0.75rem; align-items: center;">
+        <StatusBadge status={asset.Status} />
+        {asset["Review Score"] ? (
+          <span class={`score ${scoreClass(asset["Review Score"])}`}>
+            {asset["Review Score"]}/10
+          </span>
+        ) : null}
+      </div>
+    </div>
+    <div style="display: flex; gap: 0.5rem;">
+      <a href={`/assets/${id}/edit`} class="btn btn-secondary">Bearbeiten</a>
+      {asset["Publish URL"] ? (
+        <a href={asset["Publish URL"]} class="btn btn-primary" target="_blank" rel="noopener">Ansehen</a>
+      ) : null}
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem;">
+    <!-- Main content -->
+    <div>
+      <div class="card">
+        <div class="content-preview" set:html={markdownToHtml(asset.Content || "")} />
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div style="display: flex; flex-direction: column; gap: 1rem;">
+      <!-- Meta info -->
+      <div class="card">
+        <h3 style="font-size: 0.9rem; color: var(--color-text-muted); margin-bottom: 0.75rem;">Details</h3>
+        {asset.Angle ? (
+          <div style="margin-bottom: 0.5rem;">
+            <div style="font-size: 0.75rem; color: var(--color-text-muted);">Angle</div>
+            <div style="font-size: 0.9rem;">{asset.Angle}</div>
+          </div>
+        ) : null}
+        {asset.Pillar ? (
+          <div style="margin-bottom: 0.5rem;">
+            <div style="font-size: 0.75rem; color: var(--color-text-muted);">Pillar</div>
+            <div style="font-size: 0.9rem;">{asset.Pillar}</div>
+          </div>
+        ) : null}
+        {asset.CTA ? (
+          <div style="margin-bottom: 0.5rem;">
+            <div style="font-size: 0.75rem; color: var(--color-text-muted);">CTA</div>
+            <div style="font-size: 0.9rem;">{asset.CTA}</div>
+          </div>
+        ) : null}
+        {keyPoints.length > 0 ? (
+          <div>
+            <div style="font-size: 0.75rem; color: var(--color-text-muted); margin-bottom: 0.25rem;">Key Points</div>
+            <ul style="padding-left: 1rem; font-size: 0.85rem;">
+              {keyPoints.map((p) => <li>{p}</li>)}
+            </ul>
+          </div>
+        ) : null}
+      </div>
+
+      <!-- Review -->
+      {(strengths.length > 0 || issues.length > 0) ? (
+        <div class="card">
+          <h3 style="font-size: 0.9rem; color: var(--color-text-muted); margin-bottom: 0.75rem;">Review</h3>
+          {strengths.length > 0 ? (
+            <div style="margin-bottom: 0.75rem;">
+              <div style="font-size: 0.75rem; color: var(--color-success); font-weight: 600;">Stärken</div>
+              <ul style="padding-left: 1rem; font-size: 0.85rem;">
+                {strengths.map((s) => <li>{s}</li>)}
+              </ul>
+            </div>
+          ) : null}
+          {issues.length > 0 ? (
+            <div style="margin-bottom: 0.75rem;">
+              <div style="font-size: 0.75rem; color: var(--color-error); font-weight: 600;">Probleme</div>
+              <ul style="padding-left: 1rem; font-size: 0.85rem;">
+                {issues.map((i) => <li>{i}</li>)}
+              </ul>
+            </div>
+          ) : null}
+          {suggestions.length > 0 ? (
+            <div>
+              <div style="font-size: 0.75rem; color: var(--color-primary); font-weight: 600;">Vorschläge</div>
+              <ul style="padding-left: 1rem; font-size: 0.85rem;">
+                {suggestions.map((s) => <li>{s}</li>)}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      <!-- Image preview -->
+      {asset.Image ? (
+        <div class="card">
+          <h3 style="font-size: 0.9rem; color: var(--color-text-muted); margin-bottom: 0.5rem;">Bild</h3>
+          <img src={asset.Image} alt={asset.Title} style="width: 100%; border-radius: 6px;" />
+        </div>
+      ) : null}
+    </div>
+  </div>
+</Base>
+
+<style>
+  .content-preview :global(h1) { font-size: 1.5rem; margin: 1rem 0 0.5rem; }
+  .content-preview :global(h2) { font-size: 1.25rem; margin: 1.25rem 0 0.5rem; }
+  .content-preview :global(h3) { font-size: 1.1rem; margin: 1rem 0 0.4rem; }
+  .content-preview :global(p) { margin-bottom: 0.75rem; }
+  .content-preview :global(ul), .content-preview :global(ol) { padding-left: 1.5rem; margin-bottom: 0.75rem; }
+  .content-preview :global(blockquote) {
+    border-left: 3px solid var(--color-primary);
+    padding: 0.5rem 1rem;
+    margin: 0.75rem 0;
+    color: var(--color-text-muted);
+    font-style: italic;
+  }
+</style>
+

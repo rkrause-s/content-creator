@@ -54,6 +54,39 @@ export async function generateImage(options: {
   throw new Error("No image data found in Gemini response");
 }
 
+/**
+ * Generates an image and returns it as a Buffer instead of writing to disk.
+ * Used by the API service.
+ */
+export async function generateImageBuffer(options: {
+  prompt: string;
+}): Promise<{ data: Buffer; mimeType: string }> {
+  const ai = getClient();
+
+  const response = await ai.models.generateContent({
+    model: "gemini-2.5-flash-image",
+    contents: options.prompt,
+    config: {
+      responseModalities: ["TEXT", "IMAGE"],
+    },
+  });
+
+  const parts = response.candidates?.[0]?.content?.parts;
+  if (!parts) {
+    throw new Error("No content returned from Gemini image generation");
+  }
+
+  for (const part of parts) {
+    if (part.inlineData) {
+      const imageData = part.inlineData.data;
+      const mimeType = part.inlineData.mimeType ?? "image/png";
+      return { data: Buffer.from(imageData!, "base64"), mimeType };
+    }
+  }
+
+  throw new Error("No image data found in Gemini response");
+}
+
 export function buildImagePrompt(options: {
   assetType: string;
   title: string;

@@ -1,0 +1,29 @@
+---
+import Base from "../../../layouts/Base.astro";
+import MarkdownEditor from "../../../components/MarkdownEditor";
+import { getAsset } from "../../../lib/seatable";
+
+const { id } = Astro.params;
+const asset = await getAsset(id!);
+
+if (!asset) {
+  return Astro.redirect("/");
+}
+---
+
+<Base title={`${asset.Title} bearbeiten`}>
+  <div style="margin-bottom: 1.5rem;">
+    <a href={`/assets/${id}`} style="color: var(--color-text-muted); text-decoration: none; font-size: 0.85rem;">&larr; Zurück zum Asset</a>
+  </div>
+
+  <h1 style="font-size: 1.5rem; margin-bottom: 0.25rem;">{asset.Title}</h1>
+  <p style="color: var(--color-text-muted); font-size: 0.85rem; margin-bottom: 1.5rem;">
+    {asset.Type} &middot; {asset["Asset ID"]}
+  </p>
+
+  <MarkdownEditor
+    assetId={id!}
+    initialContent={asset.Content || ""}
+    client:load
+  />
+</Base>

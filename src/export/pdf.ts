@@ -202,3 +202,56 @@ export async function generatePdf(options: {
 
   return pdfPath;
 }
+
+/**
+ * Generates a PDF and returns it as a Buffer instead of writing to disk.
+ * Used by the API service.
+ */
+export async function generatePdfBuffer(options: {
+  content: string;
+  title: string;
+  language: string;
+  coverImageBase64?: string;
+}): Promise<Buffer> {
+  const template = Handlebars.compile(WHITEPAPER_TEMPLATE);
+
+  const lines = options.content.split("\n");
+  let subtitle = "";
+  const firstH1Idx = lines.findIndex((l) => l.startsWith("# "));
+  if (firstH1Idx >= 0 && lines[firstH1Idx + 2]?.startsWith("*")) {
+    subtitle = lines[firstH1Idx + 2].replace(/^\*+|\*+$/g, "");
+  }
+
+  const contentHtml = markdownToHtml(options.content);
+
+  const html = template({
+    title: options.title,
+    subtitle,
+    date: new Date().toLocaleDateString(options.language === "de" ? "de-DE" : "en-US", {
+      year: "numeric",
+      month: "long",
+    }),
+    language: options.language,
+    coverImage: options.coverImageBase64,
+    contentHtml,
+  });
+
+  const browser = await puppeteer.launch({ headless: true });
+  try {
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: "networkidle0" });
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      margin: { top: "2.5cm", right: "2cm", bottom: "2.5cm", left: "2cm" },
+      displayHeaderFooter: true,
+      headerTemplate: "<span></span>",
+      footerTemplate: `<div style="font-size:9px;color:#999;width:100%;text-align:center;padding:0 2cm;">
+        <span class="pageNumber"></span> / <span class="totalPages"></span>
+      </div>`,
+    });
+    return Buffer.from(pdfBuffer);
+  } finally {
+    await browser.close();
+  }
+}

@@ -1,0 +1,230 @@
+{
+  "name": "Content Creator: Campaign Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "campaign",
+        "responseMode": "onReceived",
+        "responseData": "allEntries"
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook: Campaign",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.API_BASE_URL }}/parse-brief",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "prompt", "value": "={{ $json.body.prompt }}" },
+            { "name": "language", "value": "={{ $json.body.language }}" }
+          ]
+        },
+        "options": { "timeout": 120000 }
+      },
+      "id": "parse-brief",
+      "name": "Parse Brief",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $env.SEATABLE_BASE_URL }}/api/v1/dtables/{{ $env.SEATABLE_DTABLE_UUID }}/rows/",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ table_name: 'Campaigns', row: { _id: $('Webhook: Campaign').item.json.body.campaignRowId, Status: 'parsing', Topic: $json.topic, 'Target Audience': $json.targetAudience, Tone: $json.tone, Goals: JSON.stringify($json.goals), 'Key Messages': JSON.stringify($json.keyMessages) } }) }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "update-campaign-brief",
+      "name": "SeaTable: Update Brief",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.API_BASE_URL }}/plan-content",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ brief: $('Parse Brief').item.json }) }}",
+        "options": { "timeout": 120000 }
+      },
+      "id": "plan-content",
+      "name": "Plan Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [860, 300]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $env.SEATABLE_BASE_URL }}/api/v1/dtables/{{ $env.SEATABLE_DTABLE_UUID }}/rows/",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ table_name: 'Campaigns', row: { _id: $('Webhook: Campaign').item.json.body.campaignRowId, Status: 'planning', Name: $json.campaignName, Pillars: JSON.stringify($json.pillars), 'Brand Voice': $json.brandVoiceGuidelines } }) }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "update-campaign-plan",
+      "name": "SeaTable: Update Plan",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1080, 300]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "assets",
+        "options": { "reset": false }
+      },
+      "id": "split-assets",
+      "name": "Split Assets",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [1300, 300],
+      "notes": "Splits planned assets for batch insertion and generation"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.API_BASE_URL }}/generate-asset",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ plannedAsset: $json, brandVoice: $('Plan Content').item.json.brandVoiceGuidelines, language: $('Webhook: Campaign').item.json.body.language }) }}",
+        "options": { "timeout": 120000 }
+      },
+      "id": "generate-asset",
+      "name": "Generate Asset",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1520, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 3,
+        "options": {}
+      },
+      "id": "batch-generate",
+      "name": "Batch Generate",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1410, 300],
+      "notes": "Process assets in batches of 3"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.API_BASE_URL }}/review-assets",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ brief: $('Parse Brief').item.json, plan: $('Plan Content').item.json, assets: $('Generate Asset').all().map(i => i.json) }) }}",
+        "options": { "timeout": 180000 }
+      },
+      "id": "review-assets",
+      "name": "Review Assets",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1740, 300]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $env.SEATABLE_BASE_URL }}/api/v1/dtables/{{ $env.SEATABLE_DTABLE_UUID }}/rows/",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ table_name: 'Campaigns', row: { _id: $('Webhook: Campaign').item.json.body.campaignRowId, Status: 'reviewing', 'Overall Score': $json.review.overallScore, 'Consistency Notes': $json.review.consistencyNotes } }) }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "update-campaign-review",
+      "name": "SeaTable: Update Review",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1960, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.API_BASE_URL }}/generate-image",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ asset: { type: $json.type, title: $json.title, topic: $('Parse Brief').item.json.topic, tone: $('Parse Brief').item.json.tone } }) }}",
+        "options": { "timeout": 120000 }
+      },
+      "id": "generate-image",
+      "name": "Generate Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2400, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $env.SEATABLE_BASE_URL }}/api/v1/dtables/{{ $env.SEATABLE_DTABLE_UUID }}/rows/",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ table_name: 'Campaigns', row: { _id: $('Webhook: Campaign').item.json.body.campaignRowId, Status: 'complete' } }) }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "complete-campaign",
+      "name": "SeaTable: Complete",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2620, 300]
+    }
+  ],
+  "connections": {
+    "Webhook: Campaign": {
+      "main": [[{ "node": "Parse Brief", "type": "main", "index": 0 }]]
+    },
+    "Parse Brief": {
+      "main": [[{ "node": "SeaTable: Update Brief", "type": "main", "index": 0 }]]
+    },
+    "SeaTable: Update Brief": {
+      "main": [[{ "node": "Plan Content", "type": "main", "index": 0 }]]
+    },
+    "Plan Content": {
+      "main": [[{ "node": "SeaTable: Update Plan", "type": "main", "index": 0 }]]
+    },
+    "SeaTable: Update Plan": {
+      "main": [[{ "node": "Split Assets", "type": "main", "index": 0 }]]
+    },
+    "Split Assets": {
+      "main": [[{ "node": "Batch Generate", "type": "main", "index": 0 }]]
+    },
+    "Batch Generate": {
+      "main": [
+        [{ "node": "Generate Asset", "type": "main", "index": 0 }],
+        [{ "node": "Review Assets", "type": "main", "index": 0 }]
+      ]
+    },
+    "Generate Asset": {
+      "main": [[{ "node": "Batch Generate", "type": "main", "index": 0 }]]
+    },
+    "Review Assets": {
+      "main": [[{ "node": "SeaTable: Update Review", "type": "main", "index": 0 }]]
+    },
+    "SeaTable: Update Review": {
+      "main": [[{ "node": "Generate Image", "type": "main", "index": 0 }]]
+    },
+    "Generate Image": {
+      "main": [[{ "node": "SeaTable: Complete", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": ""
+  },
+  "tags": [{ "name": "content-creator" }],
+  "notes": "Campaign Pipeline: Webhook → Parse Brief → Plan → Generate Assets (batched) → Review → Images → Complete.\nError handling: Each HTTP node should have continueOnFail for graceful degradation.\nSeaTable updates use Header Auth with Bearer token."
+}
