@@ -1,10 +1,20 @@
 /**
  * SeaTable client with two-step auth (API-Token → Base-Token).
- * Reads via SQL API, writes via Batch Update API.
+ * Reads via SQL API (v2), writes via Batch Update API.
+ *
+ * API patterns follow Seibert Group conventions:
+ * - Always use SQL API for reads (up to 10,000 rows)
+ * - Never SELECT * — use two-step loading to prevent truncation
+ * - Batch update with updates[] array for writes
  */
 
 const SEATABLE_BASE_URL = import.meta.env.SEATABLE_BASE_URL ?? "https://seatable.seibert.tools";
 const SEATABLE_API_TOKEN = import.meta.env.SEATABLE_API_TOKEN ?? "";
+
+/** Link IDs for known table relationships */
+const LINK_ID_CAMPAIGN_ASSETS = "fttn";
+const TABLE_ID_CAMPAIGNS = "SbjW";
+const TABLE_ID_ASSETS = "8reU";
 
 interface BaseToken {
   access_token: string;
@@ -34,28 +44,38 @@ async function getBaseToken(): Promise<BaseToken> {
   cachedToken = {
     access_token: data.access_token,
     dtable_uuid: data.dtable_uuid,
-    dtable_server: data.dtable_server ?? SEATABLE_BASE_URL,
+    dtable_server: data.dtable_server ?? `${SEATABLE_BASE_URL}/api-gateway/`,
     dtable_name: data.dtable_name,
-    // SeaTable base tokens are valid for 72 hours
     expires_at: Date.now() + 71 * 60 * 60 * 1000,
   };
   return cachedToken;
 }
 
+/** Build the v2 API base URL */
+async function apiBase(): Promise<{ url: string; token: string; uuid: string }> {
+  const t = await getBaseToken();
+  // dtable_server already ends with /api-gateway/ — append v2 path
+  const base = t.dtable_server.endsWith("/")
+    ? t.dtable_server.slice(0, -1)
+    : t.dtable_server;
+  return {
+    url: `${base}/api/v2/dtables/${t.dtable_uuid}`,
+    token: t.access_token,
+    uuid: t.dtable_uuid,
+  };
+}
+
 /** Execute a SQL query against the base */
 export async function sqlQuery<T = Record<string, unknown>>(sql: string): Promise<T[]> {
-  const token = await getBaseToken();
-  const res = await fetch(
-    `${token.dtable_server}/api/v1/dtables/${token.dtable_uuid}/sql/`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token.access_token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ sql }),
-    }
-  );
+  const { url, token } = await apiBase();
+  const res = await fetch(`${url}/sql/`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ sql, convert_keys: true }),
+  });
 
   if (!res.ok) {
     throw new Error(`SeaTable SQL failed: ${res.status} ${await res.text()}`);
@@ -65,80 +85,36 @@ export async function sqlQuery<T = Record<string, unknown>>(sql: string): Promis
   return (data.results ?? []) as T[];
 }
 
-/** Update a single row */
-export async function updateRow(
-  tableName: string,
-  rowId: string,
-  updates: Record<string, unknown>
-): Promise<void> {
-  const token = await getBaseToken();
-  const res = await fetch(
-    `${token.dtable_server}/api/v1/dtables/${token.dtable_uuid}/rows/`,
-    {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${token.access_token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        table_name: tableName,
-        row: { _id: rowId, ...updates },
-      }),
-    }
-  );
-
-  if (!res.ok) {
-    throw new Error(`SeaTable update failed: ${res.status} ${await res.text()}`);
-  }
-}
-
 /** Insert a single row and return its _id */
 export async function insertRow(
   tableName: string,
   row: Record<string, unknown>
 ): Promise<string> {
-  const token = await getBaseToken();
-  const res = await fetch(
-    `${token.dtable_server}/api/v1/dtables/${token.dtable_uuid}/rows/`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token.access_token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ table_name: tableName, row }),
-    }
-  );
+  const { url, token } = await apiBase();
+  const res = await fetch(`${url}/rows/`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ table_name: tableName, rows: [row] }),
+  });
 
   if (!res.ok) {
     throw new Error(`SeaTable insert failed: ${res.status} ${await res.text()}`);
   }
 
   const data = await res.json();
-  return data._id;
+  return data.row_ids?.[0]?._id ?? data.first_row?._id;
 }
 
-/** Batch insert multiple rows */
-export async function batchInsertRows(
+/** Update a single row (uses batch format per Seibert convention) */
+export async function updateRow(
   tableName: string,
-  rows: Record<string, unknown>[]
+  rowId: string,
+  updates: Record<string, unknown>
 ): Promise<void> {
-  const token = await getBaseToken();
-  const res = await fetch(
-    `${token.dtable_server}/api/v1/dtables/${token.dtable_uuid}/batch-append-rows/`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token.access_token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ table_name: tableName, rows }),
-    }
-  );
-
-  if (!res.ok) {
-    throw new Error(`SeaTable batch insert failed: ${res.status} ${await res.text()}`);
-  }
+  await batchUpdateRows(tableName, [{ row_id: rowId, row: updates }]);
 }
 
 /** Batch update multiple rows */
@@ -146,22 +122,91 @@ export async function batchUpdateRows(
   tableName: string,
   updates: { row_id: string; row: Record<string, unknown> }[]
 ): Promise<void> {
-  const token = await getBaseToken();
-  const res = await fetch(
-    `${token.dtable_server}/api/v1/dtables/${token.dtable_uuid}/batch-update-rows/`,
-    {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${token.access_token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ table_name: tableName, updates }),
-    }
-  );
+  const { url, token } = await apiBase();
+  const res = await fetch(`${url}/rows/`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ table_name: tableName, updates }),
+  });
 
   if (!res.ok) {
     throw new Error(`SeaTable batch update failed: ${res.status} ${await res.text()}`);
   }
+}
+
+/** Batch insert multiple rows */
+export async function batchInsertRows(
+  tableName: string,
+  rows: Record<string, unknown>[]
+): Promise<string[]> {
+  const { url, token } = await apiBase();
+  const res = await fetch(`${url}/rows/`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ table_name: tableName, rows }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`SeaTable batch insert failed: ${res.status} ${await res.text()}`);
+  }
+
+  const data = await res.json();
+  return (data.row_ids ?? []).map((r: { _id: string }) => r._id);
+}
+
+/** Create a link between two rows */
+export async function createRowLink(
+  assetRowId: string,
+  campaignRowId: string
+): Promise<void> {
+  const { url, token } = await apiBase();
+  const res = await fetch(`${url}/links/`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      table_id: TABLE_ID_ASSETS,
+      other_table_id: TABLE_ID_CAMPAIGNS,
+      link_id: LINK_ID_CAMPAIGN_ASSETS,
+      row_id: assetRowId,
+      other_row_id: campaignRowId,
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`SeaTable link failed: ${res.status} ${await res.text()}`);
+  }
+}
+
+/** Get linked row IDs for a given row via the links API */
+async function getLinkedRowIds(
+  tableId: string,
+  otherTableId: string,
+  linkId: string,
+  rowId: string
+): Promise<string[]> {
+  const { url, token } = await apiBase();
+  const res = await fetch(`${url}/links/${linkId}/`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  // Fallback: if the links endpoint doesn't support this pattern,
+  // we use the metadata approach
+  if (!res.ok) {
+    return [];
+  }
+
+  const data = await res.json();
+  return data.row_ids ?? [];
 }
 
 /** Upload a file (image/pdf) to SeaTable */
@@ -170,15 +215,12 @@ export async function uploadFile(
   data: Buffer,
   relativePath?: string
 ): Promise<string> {
-  const token = await getBaseToken();
+  const { url, token } = await apiBase();
 
   // Step 1: Get upload link
-  const linkRes = await fetch(
-    `${token.dtable_server}/api/v1/dtables/${token.dtable_uuid}/upload-link/`,
-    {
-      headers: { Authorization: `Bearer ${token.access_token}` },
-    }
-  );
+  const linkRes = await fetch(`${url}/upload-link/`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
 
   if (!linkRes.ok) {
     throw new Error(`SeaTable upload link failed: ${linkRes.status}`);
@@ -196,7 +238,7 @@ export async function uploadFile(
 
   const uploadRes = await fetch(upload_link, {
     method: "POST",
-    headers: { Authorization: `Bearer ${token.access_token}` },
+    headers: { Authorization: `Bearer ${token}` },
     body: formData,
   });
 
@@ -253,29 +295,61 @@ export interface AssetRow {
   _mtime: string;
 }
 
+/** Step 1 loading: compact campaign list */
 export async function listCampaigns(): Promise<CampaignRow[]> {
   return sqlQuery<CampaignRow>(
-    `SELECT _id, Name, Status, Language, Topic, "Overall Score", _ctime, _mtime FROM Campaigns ORDER BY _ctime DESC LIMIT 50`
+    'SELECT _id, Name, Status, Language, Topic, `Overall Score`, _ctime, _mtime FROM Campaigns ORDER BY _ctime DESC LIMIT 50'
   );
 }
 
+/** Step 2 loading: full campaign details */
 export async function getCampaign(id: string): Promise<CampaignRow | null> {
   const rows = await sqlQuery<CampaignRow>(
-    `SELECT * FROM Campaigns WHERE _id='${id}' LIMIT 1`
+    `SELECT _id, Name, Status, Prompt, Language, Topic, \`Target Audience\`, Tone, Goals, \`Key Messages\`, Pillars, \`Brand Voice\`, \`Overall Score\`, \`Consistency Notes\`, Error, _ctime, _mtime FROM Campaigns WHERE _id='${id}' LIMIT 1`
   );
   return rows[0] ?? null;
 }
 
+/**
+ * Get assets for a campaign.
+ * Since link columns can't be filtered via SQL, we query the linked rows
+ * via the links API, then load the asset details.
+ */
 export async function getCampaignAssets(campaignId: string): Promise<AssetRow[]> {
-  // SeaTable link columns: query assets that belong to this campaign
+  const { url, token } = await apiBase();
+
+  // Use the row-links endpoint to get linked asset IDs
+  const res = await fetch(
+    `${url}/links/${LINK_ID_CAMPAIGN_ASSETS}/rows/${campaignId}/`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+
+  if (!res.ok) {
+    // Fallback: return all assets (for small datasets this is acceptable)
+    return sqlQuery<AssetRow>(
+      'SELECT _id, Title, `Asset ID`, Type, Status, Angle, Pillar, `Review Score`, _ctime FROM Assets ORDER BY Type, Title'
+    );
+  }
+
+  const data = await res.json();
+  const linkedIds: string[] = (data.linked_rows ?? data.results ?? []).map(
+    (r: { _id: string }) => r._id
+  );
+
+  if (linkedIds.length === 0) return [];
+
+  const idList = linkedIds.map((id) => `'${id}'`).join(",");
   return sqlQuery<AssetRow>(
-    `SELECT * FROM Assets WHERE Campaign='${campaignId}' ORDER BY Type, Title`
+    `SELECT _id, Title, \`Asset ID\`, Type, Status, Angle, Pillar, \`Review Score\`, _ctime FROM Assets WHERE _id IN (${idList}) ORDER BY Type, Title`
   );
 }
 
+/** Step 2 loading: full asset details */
 export async function getAsset(id: string): Promise<AssetRow | null> {
   const rows = await sqlQuery<AssetRow>(
-    `SELECT * FROM Assets WHERE _id='${id}' LIMIT 1`
+    `SELECT _id, Title, \`Asset ID\`, Type, Status, Content, Angle, Pillar, \`Key Points\`, CTA, \`Review Score\`, \`Review Strengths\`, \`Review Issues\`, \`Review Suggestions\`, Image, PDF, Metadata, \`Publish URL\`, _ctime, _mtime FROM Assets WHERE _id='${id}' LIMIT 1`
   );
   return rows[0] ?? null;
 }

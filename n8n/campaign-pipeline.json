@@ -36,10 +36,10 @@
     {
       "parameters": {
         "method": "PUT",
-        "url": "={{ $env.SEATABLE_BASE_URL }}/api/v1/dtables/{{ $env.SEATABLE_DTABLE_UUID }}/rows/",
+        "url": "={{ $env.SEATABLE_BASE_URL }}/api-gateway/api/v2/dtables/{{ $env.SEATABLE_DTABLE_UUID }}/rows/",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ table_name: 'Campaigns', row: { _id: $('Webhook: Campaign').item.json.body.campaignRowId, Status: 'parsing', Topic: $json.topic, 'Target Audience': $json.targetAudience, Tone: $json.tone, Goals: JSON.stringify($json.goals), 'Key Messages': JSON.stringify($json.keyMessages) } }) }}",
+        "jsonBody": "={{ JSON.stringify({ table_name: 'Campaigns', updates: [{ row_id: $('Webhook: Campaign').item.json.body.campaignRowId, row: { Status: 'parsing', Topic: $json.topic, 'Target Audience': $json.targetAudience, Tone: $json.tone, Goals: JSON.stringify($json.goals), 'Key Messages': JSON.stringify($json.keyMessages) } }] }) }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth"
       },
@@ -67,10 +67,10 @@
     {
       "parameters": {
         "method": "PUT",
-        "url": "={{ $env.SEATABLE_BASE_URL }}/api/v1/dtables/{{ $env.SEATABLE_DTABLE_UUID }}/rows/",
+        "url": "={{ $env.SEATABLE_BASE_URL }}/api-gateway/api/v2/dtables/{{ $env.SEATABLE_DTABLE_UUID }}/rows/",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ table_name: 'Campaigns', row: { _id: $('Webhook: Campaign').item.json.body.campaignRowId, Status: 'planning', Name: $json.campaignName, Pillars: JSON.stringify($json.pillars), 'Brand Voice': $json.brandVoiceGuidelines } }) }}",
+        "jsonBody": "={{ JSON.stringify({ table_name: 'Campaigns', updates: [{ row_id: $('Webhook: Campaign').item.json.body.campaignRowId, row: { Status: 'planning', Name: $json.campaignName, Pillars: JSON.stringify($json.pillars), 'Brand Voice': $json.brandVoiceGuidelines } }] }) }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth"
       },
@@ -137,10 +137,10 @@
     {
       "parameters": {
         "method": "PUT",
-        "url": "={{ $env.SEATABLE_BASE_URL }}/api/v1/dtables/{{ $env.SEATABLE_DTABLE_UUID }}/rows/",
+        "url": "={{ $env.SEATABLE_BASE_URL }}/api-gateway/api/v2/dtables/{{ $env.SEATABLE_DTABLE_UUID }}/rows/",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ table_name: 'Campaigns', row: { _id: $('Webhook: Campaign').item.json.body.campaignRowId, Status: 'reviewing', 'Overall Score': $json.review.overallScore, 'Consistency Notes': $json.review.consistencyNotes } }) }}",
+        "jsonBody": "={{ JSON.stringify({ table_name: 'Campaigns', updates: [{ row_id: $('Webhook: Campaign').item.json.body.campaignRowId, row: { Status: 'reviewing', 'Overall Score': $json.review.overallScore, 'Consistency Notes': $json.review.consistencyNotes } }] }) }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth"
       },
@@ -169,10 +169,10 @@
     {
       "parameters": {
         "method": "PUT",
-        "url": "={{ $env.SEATABLE_BASE_URL }}/api/v1/dtables/{{ $env.SEATABLE_DTABLE_UUID }}/rows/",
+        "url": "={{ $env.SEATABLE_BASE_URL }}/api-gateway/api/v2/dtables/{{ $env.SEATABLE_DTABLE_UUID }}/rows/",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ table_name: 'Campaigns', row: { _id: $('Webhook: Campaign').item.json.body.campaignRowId, Status: 'complete' } }) }}",
+        "jsonBody": "={{ JSON.stringify({ table_name: 'Campaigns', updates: [{ row_id: $('Webhook: Campaign').item.json.body.campaignRowId, row: { Status: 'complete' } }] }) }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth"
       },

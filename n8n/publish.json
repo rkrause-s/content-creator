@@ -17,10 +17,10 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.SEATABLE_BASE_URL }}/api/v1/dtables/{{ $env.SEATABLE_DTABLE_UUID }}/sql/",
+        "url": "={{ $env.SEATABLE_BASE_URL }}/api-gateway/api/v2/dtables/{{ $env.SEATABLE_DTABLE_UUID }}/sql/",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ sql: `SELECT * FROM Campaigns WHERE _id='${$json.body.campaignRowId}' LIMIT 1` }) }}",
+        "jsonBody": "={{ JSON.stringify({ sql: `SELECT _id, Name FROM Campaigns WHERE _id='${$json.body.campaignRowId}' LIMIT 1`, convert_keys: true }) }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth"
       },
@@ -33,10 +33,10 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.SEATABLE_BASE_URL }}/api/v1/dtables/{{ $env.SEATABLE_DTABLE_UUID }}/sql/",
+        "url": "={{ $env.SEATABLE_BASE_URL }}/api-gateway/api/v2/dtables/{{ $env.SEATABLE_DTABLE_UUID }}/sql/",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ sql: `SELECT * FROM Assets WHERE _id IN (${$('Webhook: Publish').item.json.body.assetRowIds.map(id => \"'\" + id + \"'\").join(',')})` }) }}",
+        "jsonBody": "={{ JSON.stringify({ sql: `SELECT _id, Title, \\`Asset ID\\`, Type, Content, Metadata FROM Assets WHERE _id IN (${$('Webhook: Publish').item.json.body.assetRowIds.map(id => \"'\" + id + \"'\").join(',')})`, convert_keys: true }) }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth"
       },
@@ -64,7 +64,7 @@
     {
       "parameters": {
         "method": "PUT",
-        "url": "={{ $env.SEATABLE_BASE_URL }}/api/v1/dtables/{{ $env.SEATABLE_DTABLE_UUID }}/batch-update-rows/",
+        "url": "={{ $env.SEATABLE_BASE_URL }}/api-gateway/api/v2/dtables/{{ $env.SEATABLE_DTABLE_UUID }}/rows/",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ table_name: 'Assets', updates: $json.published.map(p => ({ row_id: $('Webhook: Publish').item.json.body.assetRowIds.find((id, i) => $('SeaTable: Read Assets').item.json.results[i]?.['Asset ID'] === p.assetId) || '', row: { Status: 'published', 'Publish URL': p.url } })) }) }}",
