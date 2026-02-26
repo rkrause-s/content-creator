@@ -49,8 +49,8 @@ export async function publishToRepo(
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "content-publish-"));
 
   try {
-    // Clone the repo (shallow)
-    exec(`git clone --depth 1 https://github.com/${repoFull}.git "${tmpDir}/repo"`);
+    // Clone the repo
+    exec(`gh repo clone "${repoFull}" "${tmpDir}/repo" -- --depth 1`);
     const repoDir = path.join(tmpDir, "repo");
 
     // Create branch
@@ -72,7 +72,11 @@ export async function publishToRepo(
       });
     }
 
-    // Stage, commit, push
+    // Install dependencies and verify build (also updates pages.json)
+    exec("pnpm install --frozen-lockfile", repoDir);
+    exec("pnpm build", repoDir);
+
+    // Stage all changes including updated pages.json from build
     exec("git add -A", repoDir);
     exec(
       `git commit -m "Add ${published.length} content asset(s) from campaign: ${campaignName}"`,
@@ -85,7 +89,7 @@ export async function publishToRepo(
     if (options.createPr !== false) {
       const prBody = buildPrBody(published, campaignName);
       const result = exec(
-        `gh pr create --repo "${repoFull}" --title "Content: ${campaignName}" --body "${escapeShell(prBody)}"`,
+        `gh pr create --repo "${repoFull}" --head "${branchName}" --title "Content: ${campaignName}" --body "${escapeShell(prBody)}"`,
         repoDir
       );
       prUrl = result.trim();
@@ -116,11 +120,37 @@ function slugify(text: string): string {
 }
 
 function exec(cmd: string, cwd?: string): string {
-  return execSync(cmd, { cwd, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] });
+  return execSync(cmd, { cwd, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"], timeout: 300_000 });
 }
+
 
 function escapeShell(str: string): string {
   return str.replace(/"/g, '\\"').replace(/\$/g, "\\$").replace(/`/g, "\\`");
+}
+
+/**
+ * Strips Gemini artifacts and MDX-incompatible elements from generated markdown.
+ */
+function sanitizeForMdx(content: string): string {
+  let cleaned = content;
+
+  // Strip wrapping code fences (```markdown ... ``` or ``` ... ```)
+  cleaned = cleaned.replace(/^```\w*\n/m, "").replace(/\n```\s*$/m, "");
+
+  // Remove horizontal rules (--- / *** / ___) — they break MDX inside JSX components
+  cleaned = cleaned.replace(/^\s*[-*_]{3,}\s*$/gm, "");
+
+  // Remove meta description / keywords lines (belong in frontmatter, not body)
+  cleaned = cleaned.replace(/^\*{0,2}Meta[- ]?Beschreibung\*{0,2}:.*$/gim, "");
+  cleaned = cleaned.replace(/^\*{0,2}Keywords?\*{0,2}:.*$/gim, "");
+
+  // Remove stray code fences that aren't part of actual code blocks
+  cleaned = cleaned.replace(/^```\s*$/gm, "");
+
+  // Collapse triple+ blank lines to double
+  cleaned = cleaned.replace(/\n{3,}/g, "\n\n");
+
+  return cleaned.trim();
 }
 
 /**
@@ -130,14 +160,17 @@ function escapeShell(str: string): string {
 function convertToMdx(asset: GeneratedAsset): string {
   const slug = slugify(asset.title);
   const isLandingPage = asset.type === "landing-page";
+  const sanitized = sanitizeForMdx(asset.content);
 
-  // Extract first paragraph as description (max 160 chars)
-  const descriptionMatch = asset.content
-    .replace(/^#.*\n+/m, "")
-    .replace(/^\*.*\*\n*/m, "")
+  // Extract first real paragraph as description (max 160 chars)
+  const descriptionMatch = sanitized
+    .replace(/^#.*$/m, "")       // skip H1
+    .replace(/^\*[^*].*\*$/m, "") // skip italic subtitle
     .trim()
-    .split("\n")[0];
-  const description = (descriptionMatch ?? asset.title).slice(0, 157) + (descriptionMatch && descriptionMatch.length > 157 ? "..." : "");
+    .split("\n")
+    .find((line) => line.trim().length > 20 && !line.startsWith("#") && !line.startsWith("*   ") && !line.startsWith(">"));
+  const rawDesc = descriptionMatch ?? asset.title;
+  const description = rawDesc.length > 157 ? rawDesc.slice(0, 157) + "..." : rawDesc;
 
   const frontmatter = [
     "---",
@@ -145,7 +178,6 @@ function convertToMdx(asset: GeneratedAsset): string {
     `description: "${escapeFrontmatter(description)}"`,
     `uid: ${slug}`,
     ...(isLandingPage ? ["landingPage: true"] : []),
-    "draft: true",
     "---",
   ].join("\n");
 
@@ -161,7 +193,7 @@ function convertToMdx(asset: GeneratedAsset): string {
     imports.push('import FormContact from "@seibert/astro-ui/components/FormContact.astro";');
   }
 
-  const body = markdownToMdxBody(asset.content, isLandingPage);
+  const body = markdownToMdxBody(sanitized, isLandingPage);
 
   return `${frontmatter}\n\n${imports.join("\n")}\n\n${body}\n`;
 }
@@ -206,12 +238,15 @@ function markdownToMdxBody(markdown: string, isLandingPage: boolean): string {
 
   const parts: string[] = [];
 
-  // Hero / PageHeader
-  const headerProps = [`heading={{ text: "${escapeFrontmatter(title)}", level: 1 }}`];
+  // Separate intro content (before first H2) from H2 sections
+  const introSection = sections.length > 0 && !sections[0].heading ? sections.shift() : null;
+
+  // Hero / PageHeader — include intro text if present
   parts.push(
     `<Container verticalPadding="${isLandingPage ? "xl" : "md"}">`,
-    `  <PageHeader ${headerProps.join(" ")}>`,
-    subtitle ? `    ${subtitle}` : "",
+    `  <PageHeader heading={{ text: "${escapeFrontmatter(title)}", level: 1 }}>`,
+    ...(subtitle ? [`    ${subtitle}`] : []),
+    ...(introSection ? ["", introSection.body] : []),
     "  </PageHeader>",
     "</Container>"
   );
@@ -289,7 +324,7 @@ Auto-generated content assets:
 
 ${fileList}
 
-All pages are created as \`draft: true\` and need review before publishing.
+Pages are live on the Vercel preview once this PR is created — review before merging.
 
 ---
 Generated with content-creator pipeline`;
