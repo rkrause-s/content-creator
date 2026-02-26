@@ -1,8 +1,7 @@
 import type { APIRoute } from "astro";
 import { insertRow, getCampaign } from "../../lib/seatable";
-import { triggerCampaignPipeline } from "../../lib/n8n";
 
-/** POST: Create new campaign, insert into SeaTable, trigger n8n */
+/** POST: Create new campaign, insert into SeaTable with status=queued */
 export const POST: APIRoute = async ({ request }) => {
   const { prompt, language } = await request.json();
 
@@ -15,18 +14,9 @@ export const POST: APIRoute = async ({ request }) => {
 
   const campaignId = await insertRow("Campaigns", {
     Name: "",
-    Status: "draft",
+    Status: "queued",
     Prompt: prompt,
     Language: language ?? "de",
-  });
-
-  // Fire-and-forget: trigger n8n webhook
-  triggerCampaignPipeline({
-    prompt,
-    language: language ?? "de",
-    campaignRowId: campaignId,
-  }).catch((err) => {
-    console.error("Failed to trigger n8n campaign pipeline:", err);
   });
 
   return new Response(JSON.stringify({ campaignId }), {

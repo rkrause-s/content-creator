@@ -68,7 +68,7 @@ export default function CampaignForm() {
       )}
 
       <button type="submit" className="btn btn-primary" disabled={submitting}>
-        {submitting ? "Kampagne wird erstellt..." : "Kampagne starten"}
+        {submitting ? "Wird gespeichert..." : "Kampagne starten"}
       </button>
     </form>
   );

@@ -1,20 +1,26 @@
 import type { APIRoute } from "astro";
-import { triggerPublish } from "../../lib/n8n";
+import { batchUpdateRows } from "../../lib/seatable";
 
-/** POST: Trigger publish workflow for selected assets */
+/** POST: Mark selected assets as publish-queued for n8n pickup */
 export const POST: APIRoute = async ({ request }) => {
-  const { campaignRowId, assetRowIds } = await request.json();
+  const { assetRowIds } = await request.json();
 
-  if (!campaignRowId || !assetRowIds?.length) {
+  if (!assetRowIds?.length) {
     return new Response(
-      JSON.stringify({ error: "campaignRowId and assetRowIds[] are required" }),
+      JSON.stringify({ error: "assetRowIds[] is required" }),
       { status: 400, headers: { "Content-Type": "application/json" } }
     );
   }
 
-  await triggerPublish({ campaignRowId, assetRowIds });
+  await batchUpdateRows(
+    "Assets",
+    assetRowIds.map((id: string) => ({
+      row_id: id,
+      row: { Status: "publish-queued" },
+    }))
+  );
 
-  return new Response(JSON.stringify({ ok: true }), {
+  return new Response(JSON.stringify({ ok: true, queued: assetRowIds.length }), {
     headers: { "Content-Type": "application/json" },
   });
 };

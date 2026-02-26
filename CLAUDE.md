@@ -67,3 +67,23 @@ The runner (`src/pipeline/runner.ts`) calls `loadBrandConfig()` at startup and s
 - `GEMINI_API_KEY` env var required; `GEMINI_MODEL` defaults to `gemini-2.5-flash`
 - Image and PDF generation are non-fatal — failures log warnings and continue
 - `src/dry-run.ts` contains hardcoded simulated pipeline data for testing export/image/PDF without Claude API calls
+
+## Production Stack
+
+```
+[Web UI (Astro)]  ←→  [SeaTable]  ←→  [n8n (Scheduled)]  →  [Gemini API]
+```
+
+- **Web UI** (`web/`): Astro SSR + React islands. Reads/writes SeaTable directly. No n8n interaction.
+- **n8n workflows** (`n8n/`): Schedule-based. Poll SeaTable for work, call Gemini directly, write results back.
+- **SeaTable**: Data store for campaigns and assets. Base on `seatable.seibert.tools`.
+
+### Web UI (`web/`)
+- `web/src/lib/seatable.ts` — SeaTable client (two-step auth, SQL reads, batch writes)
+- `web/src/pages/api/campaigns.ts` — POST creates campaign (status=queued), GET polls status
+- `web/src/pages/api/publish.ts` — POST sets assets to status=publish-queued
+- `web/src/components/` — React islands: CampaignForm, MarkdownEditor, StatusPoller
+
+### n8n Workflows (`n8n/`)
+- `campaign-pipeline.json` — Polls every 2 min for queued campaigns. Gemini nodes are noOp placeholders with full prompt docs in `notes`.
+- `publish.json` — Polls every 5 min for publish-queued assets. Code nodes are noOp placeholders with MDX conversion docs.

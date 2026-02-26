@@ -3,15 +3,14 @@
   "nodes": [
     {
       "parameters": {
-        "httpMethod": "POST",
-        "path": "publish",
-        "responseMode": "onReceived",
-        "responseData": "allEntries"
+        "rule": {
+          "interval": [{ "field": "minutes", "minutesInterval": 5 }]
+        }
       },
-      "id": "webhook-publish",
-      "name": "Webhook: Publish",
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2,
+      "id": "schedule-trigger",
+      "name": "Schedule: Every 5 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
       "position": [200, 300]
     },
     {
@@ -20,46 +19,35 @@
         "url": "={{ $env.SEATABLE_BASE_URL }}/api-gateway/api/v2/dtables/{{ $env.SEATABLE_DTABLE_UUID }}/sql/",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ sql: `SELECT _id, Name FROM Campaigns WHERE _id='${$json.body.campaignRowId}' LIMIT 1`, convert_keys: true }) }}",
+        "jsonBody": "={{ JSON.stringify({ sql: \"SELECT _id, Title, `Asset ID`, Type, Content, Metadata FROM Assets WHERE Status='publish-queued'\", convert_keys: true }) }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth"
       },
-      "id": "read-campaign",
-      "name": "SeaTable: Read Campaign",
+      "id": "poll-publish-queued",
+      "name": "SeaTable: Poll Publish-Queued",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [420, 300]
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "={{ $env.SEATABLE_BASE_URL }}/api-gateway/api/v2/dtables/{{ $env.SEATABLE_DTABLE_UUID }}/sql/",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ sql: `SELECT _id, Title, \\`Asset ID\\`, Type, Content, Metadata FROM Assets WHERE _id IN (${$('Webhook: Publish').item.json.body.assetRowIds.map(id => \"'\" + id + \"'\").join(',')})`, convert_keys: true }) }}",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth"
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "" },
+          "conditions": [
+            {
+              "id": "has-results",
+              "leftValue": "={{ $json.results.length }}",
+              "rightValue": "0",
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ]
+        }
       },
-      "id": "read-assets",
-      "name": "SeaTable: Read Assets",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [420, 500]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "={{ $env.API_BASE_URL }}/publish",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ assets: $('SeaTable: Read Assets').item.json.results.map(a => ({ id: a['Asset ID'], type: a.Type, title: a.Title, content: a.Content, metadata: JSON.parse(a.Metadata || '{}') })), campaignName: $('SeaTable: Read Campaign').item.json.results[0].Name }) }}",
-        "options": { "timeout": 300000 }
-      },
-      "id": "publish-to-repo",
-      "name": "Publish to Repo",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [700, 400]
+      "id": "if-has-work",
+      "name": "IF: Has Assets to Publish",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [640, 300]
     },
     {
       "parameters": {
@@ -67,7 +55,41 @@
         "url": "={{ $env.SEATABLE_BASE_URL }}/api-gateway/api/v2/dtables/{{ $env.SEATABLE_DTABLE_UUID }}/rows/",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ table_name: 'Assets', updates: $json.published.map(p => ({ row_id: $('Webhook: Publish').item.json.body.assetRowIds.find((id, i) => $('SeaTable: Read Assets').item.json.results[i]?.['Asset ID'] === p.assetId) || '', row: { Status: 'published', 'Publish URL': p.url } })) }) }}",
+        "jsonBody": "={{ JSON.stringify({ table_name: 'Assets', updates: $json.results.map(a => ({ row_id: a._id, row: { Status: 'publishing' } })) }) }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "set-publishing",
+      "name": "SeaTable: Set Publishing",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [860, 300]
+    },
+    {
+      "parameters": {},
+      "id": "convert-to-mdx",
+      "name": "Code: Convert to MDX",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1080, 300],
+      "notes": "PLACEHOLDER — Replace with Code node.\n\nThis node converts asset content to MDX format for the target GitHub repo.\n\nLogic (from src/shared/mdx.ts):\n1. Slugify the asset title for the filename (lowercase, replace spaces/special chars with hyphens)\n2. Build frontmatter:\n   ---\n   title: \"Asset Title\"\n   description: \"First 160 chars of content\"\n   date: YYYY-MM-DD\n   tags: [asset-type, pillar]\n   type: asset-type\n   ---\n3. Sanitize content for MDX:\n   - Escape curly braces { } → {'{'} {'}'}\n   - Escape < > in non-HTML contexts\n   - Remove or escape JSX-incompatible constructs\n4. Wrap: frontmatter + '\\n\\n' + sanitized content\n\nOutput per asset: { slug, mdxContent, assetId }"
+    },
+    {
+      "parameters": {},
+      "id": "push-to-github",
+      "name": "Code: Push to GitHub",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1300, 300],
+      "notes": "PLACEHOLDER — Replace with GitHub node or Code node.\n\nFor each asset from the previous step:\n1. Create/update file at content/{type}/{slug}.mdx in the target repo\n2. Commit with message: 'Add {type}: {title}'\n3. Optionally create a PR\n\nOutput per asset: { assetId, url }"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $env.SEATABLE_BASE_URL }}/api-gateway/api/v2/dtables/{{ $env.SEATABLE_DTABLE_UUID }}/rows/",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ table_name: 'Assets', updates: $('SeaTable: Poll Publish-Queued').item.json.results.map(a => ({ row_id: a._id, row: { Status: 'published' } })) }) }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth"
       },
@@ -75,25 +97,29 @@
       "name": "SeaTable: Update Published",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [920, 400]
+      "position": [1520, 300]
     }
   ],
   "connections": {
-    "Webhook: Publish": {
+    "Schedule: Every 5 min": {
+      "main": [[{ "node": "SeaTable: Poll Publish-Queued", "type": "main", "index": 0 }]]
+    },
+    "SeaTable: Poll Publish-Queued": {
+      "main": [[{ "node": "IF: Has Assets to Publish", "type": "main", "index": 0 }]]
+    },
+    "IF: Has Assets to Publish": {
       "main": [
-        [
-          { "node": "SeaTable: Read Campaign", "type": "main", "index": 0 },
-          { "node": "SeaTable: Read Assets", "type": "main", "index": 0 }
-        ]
+        [{ "node": "SeaTable: Set Publishing", "type": "main", "index": 0 }],
+        []
       ]
     },
-    "SeaTable: Read Campaign": {
-      "main": [[{ "node": "Publish to Repo", "type": "main", "index": 0 }]]
+    "SeaTable: Set Publishing": {
+      "main": [[{ "node": "Code: Convert to MDX", "type": "main", "index": 0 }]]
     },
-    "SeaTable: Read Assets": {
-      "main": [[{ "node": "Publish to Repo", "type": "main", "index": 0 }]]
+    "Code: Convert to MDX": {
+      "main": [[{ "node": "Code: Push to GitHub", "type": "main", "index": 0 }]]
     },
-    "Publish to Repo": {
+    "Code: Push to GitHub": {
       "main": [[{ "node": "SeaTable: Update Published", "type": "main", "index": 0 }]]
     }
   },
@@ -101,5 +127,5 @@
     "executionOrder": "v1"
   },
   "tags": [{ "name": "content-creator" }],
-  "notes": "Publish Workflow: Reads campaign + selected assets from SeaTable, calls API /publish, updates status to published."
+  "notes": "Schedule-based Publish Workflow. Polls SeaTable every 5 min for assets with status=publish-queued. Code nodes are placeholders (noOp) with conversion/push documentation in their notes fields."
 }
