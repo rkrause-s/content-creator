@@ -9,7 +9,9 @@ function getClient(): GoogleGenAI {
   if (!client) {
     const apiKey = config.geminiApiKey || process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      throw new Error("GEMINI_API_KEY is not set. Add it to .env or set as environment variable.");
+      throw new Error(
+        "GEMINI_API_KEY is not set. Copy .env.example to .env and add your key, or set it as an environment variable."
+      );
     }
     client = new GoogleGenAI({ apiKey });
   }

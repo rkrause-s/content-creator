@@ -3,17 +3,16 @@ import dotenv from "dotenv";
 dotenv.config();
 
 export const config = {
-  anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? "",
-  model: process.env.CLAUDE_MODEL ?? "claude-sonnet-4-20250514",
+  geminiApiKey: process.env.GEMINI_API_KEY ?? "",
+  model: process.env.GEMINI_MODEL ?? "gemini-2.5-flash",
   maxConcurrent: parseInt(process.env.MAX_CONCURRENT_GENERATORS ?? "3", 10),
   defaultLanguage: process.env.DEFAULT_LANGUAGE ?? "de",
-  geminiApiKey: process.env.GEMINI_API_KEY ?? "",
 };
 
 export function validateConfig(): void {
-  if (!config.anthropicApiKey && !process.env.ANTHROPIC_API_KEY) {
+  if (!config.geminiApiKey && !process.env.GEMINI_API_KEY) {
     throw new Error(
-      "ANTHROPIC_API_KEY is not set. Copy .env.example to .env and add your key, or set it as an environment variable."
+      "GEMINI_API_KEY is not set. Copy .env.example to .env and add your key, or set it as an environment variable."
     );
   }
 }

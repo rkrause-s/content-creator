@@ -8,7 +8,6 @@ import { reviewAssets } from "./stages/review.js";
 import { exportCampaign } from "./stages/export.js";
 import { generateImages } from "./stages/generate-images.js";
 import { generatePdfs } from "./stages/generate-pdfs.js";
-import { config } from "../config.js";
 import { loadBrandConfig } from "../brand/loader.js";
 
 export interface RunOptions {
@@ -98,8 +97,7 @@ export async function runPipeline(userPrompt: string, options: RunOptions): Prom
   }
 
   // Stage 6: Generate Images (Gemini)
-  const hasGeminiKey = config.geminiApiKey || process.env.GEMINI_API_KEY;
-  if (!options.skipImages && hasGeminiKey) {
+  if (!options.skipImages) {
     spinner = ora(`Generating images for ${state.assets.length} assets...`).start();
     try {
       state.assets = await generateImages(state.assets, state.brief, state.outputDir!, state.brandImageContext);
@@ -108,8 +106,6 @@ export async function runPipeline(userPrompt: string, options: RunOptions): Prom
     } catch (err) {
       spinner.fail("Image generation failed (continuing without images)");
     }
-  } else if (!options.skipImages && !hasGeminiKey) {
-    console.log(chalk.dim("  Skipping image generation (no GEMINI_API_KEY set)"));
   }
 
   // Stage 7: Generate PDFs (whitepapers)

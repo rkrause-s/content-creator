@@ -10,7 +10,7 @@ const program = new Command();
 
 program
   .name("content-creator")
-  .description("Automated marketing content pipeline powered by Claude AI")
+  .description("Automated marketing content pipeline powered by Google Gemini")
   .version("1.0.0");
 
 program

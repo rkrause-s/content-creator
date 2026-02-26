@@ -1,14 +1,18 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import { config } from "../config.js";
 
-let client: Anthropic | null = null;
+let client: GoogleGenAI | null = null;
 
-function getClient(): Anthropic {
+function getClient(): GoogleGenAI {
   if (!client) {
-    client = config.anthropicApiKey
-      ? new Anthropic({ apiKey: config.anthropicApiKey })
-      : new Anthropic();
+    const apiKey = config.geminiApiKey || process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error(
+        "GEMINI_API_KEY is not set. Copy .env.example to .env and add your key, or set it as an environment variable."
+      );
+    }
+    client = new GoogleGenAI({ apiKey });
   }
   return client;
 }
@@ -19,30 +23,26 @@ export async function generateStructured<T>(options: {
   schema: z.ZodType<T>;
   schemaName: string;
 }): Promise<T> {
-  const anthropic = getClient();
+  const ai = getClient();
   const jsonSchema = z.toJSONSchema(options.schema);
 
-  const response = await anthropic.messages.create({
+  const response = await ai.models.generateContent({
     model: config.model,
-    max_tokens: 8192,
-    system: options.system,
-    messages: [{ role: "user", content: options.prompt }],
-    tools: [
-      {
-        name: options.schemaName,
-        description: `Output structured data as ${options.schemaName}`,
-        input_schema: jsonSchema as Anthropic.Tool["input_schema"],
-      },
-    ],
-    tool_choice: { type: "tool", name: options.schemaName },
+    contents: options.prompt,
+    config: {
+      systemInstruction: options.system,
+      responseMimeType: "application/json",
+      responseSchema: jsonSchema as Record<string, unknown>,
+      maxOutputTokens: 8192,
+    },
   });
 
-  const toolBlock = response.content.find((b) => b.type === "tool_use");
-  if (!toolBlock || toolBlock.type !== "tool_use") {
-    throw new Error("No structured output returned from Claude");
+  const text = response.text;
+  if (!text) {
+    throw new Error("No structured output returned from Gemini");
   }
 
-  return options.schema.parse(toolBlock.input);
+  return options.schema.parse(JSON.parse(text));
 }
 
 export async function generateText(options: {
@@ -50,19 +50,21 @@ export async function generateText(options: {
   prompt: string;
   maxTokens?: number;
 }): Promise<string> {
-  const anthropic = getClient();
+  const ai = getClient();
 
-  const response = await anthropic.messages.create({
+  const response = await ai.models.generateContent({
     model: config.model,
-    max_tokens: options.maxTokens ?? 4096,
-    system: options.system,
-    messages: [{ role: "user", content: options.prompt }],
+    contents: options.prompt,
+    config: {
+      systemInstruction: options.system,
+      maxOutputTokens: options.maxTokens ?? 4096,
+    },
   });
 
-  const textBlock = response.content.find((b) => b.type === "text");
-  if (!textBlock || textBlock.type !== "text") {
-    throw new Error("No text output returned from Claude");
+  const text = response.text;
+  if (!text) {
+    throw new Error("No text output returned from Gemini");
   }
 
-  return textBlock.text;
+  return text;
 }

@@ -1,7 +1,7 @@
 {
   "name": "content-creator",
   "version": "1.0.0",
-  "description": "Automated marketing content pipeline powered by Claude AI",
+  "description": "Automated marketing content pipeline powered by Google Gemini",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -16,12 +16,11 @@
     "marketing",
     "content",
     "ai",
-    "claude",
+    "gemini",
     "pipeline"
   ],
   "license": "MIT",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.78.0",
     "@google/genai": "^1.42.0",
     "chalk": "^5.6.2",
     "commander": "^14.0.3",

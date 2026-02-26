@@ -1,6 +1,6 @@
 # Content Creator Pipeline
 
-Automatisierte Marketing-Content-Pipeline powered by Claude AI und Gemini. Ein Prompt rein, eine komplette Kampagne raus: Content-Plan, Blog-Artikel, Social-Media-Posts, Newsletter, Whitepaper-PDFs und passende Grafiken.
+Automatisierte Marketing-Content-Pipeline powered by Google Gemini. Ein Prompt rein, eine komplette Kampagne raus: Content-Plan, Blog-Artikel, Social-Media-Posts, Newsletter, Whitepaper-PDFs und passende Grafiken.
 
 ## Quickstart
 
@@ -8,9 +8,9 @@ Automatisierte Marketing-Content-Pipeline powered by Claude AI und Gemini. Ein P
 # Dependencies installieren
 npm install
 
-# API-Keys konfigurieren
+# API-Key konfigurieren
 cp .env.example .env
-# ANTHROPIC_API_KEY und GEMINI_API_KEY in .env eintragen
+# GEMINI_API_KEY in .env eintragen
 
 # Bauen
 npm run build
@@ -52,12 +52,12 @@ npx content-creator list-assets
 ```
 User-Prompt
   │
-  ├─ 1. Parse Brief ──────── Freitext → strukturiertes CampaignBrief (Claude, structured output)
+  ├─ 1. Parse Brief ──────── Freitext → strukturiertes CampaignBrief (Gemini, structured output)
   ├─ 2. Plan Content ─────── Brief → ContentPlan mit Pillars, Assets, Brand Voice
-  ├─ 3. Generate Assets ──── Parallele Textgenerierung (max 3 concurrent, Claude)
+  ├─ 3. Generate Assets ──── Parallele Textgenerierung (max 3 concurrent, Gemini)
   ├─ 4. Review ────────────── Qualitätsprüfung + automatische Revision (Score < 7)
   ├─ 5. Export ────────────── Markdown, JSON, HTML-Preview
-  ├─ 6. Generate Images ──── Grafiken pro Asset (Gemini, optional)
+  ├─ 6. Generate Images ──── Grafiken pro Asset (Gemini)
   └─ 7. Generate PDFs ────── Whitepaper als A4-PDF (Puppeteer)
 ```
 
@@ -93,9 +93,8 @@ output/campaign-2026-02-25T21-41-42/
 
 | Variable | Default | Beschreibung |
 |----------|---------|-------------|
-| `ANTHROPIC_API_KEY` | — | Claude API-Key (erforderlich) |
-| `GEMINI_API_KEY` | — | Gemini API-Key für Bildgenerierung (optional) |
-| `CLAUDE_MODEL` | `claude-sonnet-4-20250514` | Claude-Modell |
+| `GEMINI_API_KEY` | — | Google Gemini API-Key (erforderlich) |
+| `GEMINI_MODEL` | `gemini-2.5-flash` | Gemini-Modell für Text und structured output |
 | `MAX_CONCURRENT_GENERATORS` | `3` | Parallele Asset-Generierung |
 | `DEFAULT_LANGUAGE` | `de` | Content-Sprache (`de` / `en`) |
 
@@ -139,7 +138,7 @@ npx content-creator generate --brand ./mein-brand "..."
 ## Tech Stack
 
 - **Runtime**: Node.js + TypeScript
-- **AI Text**: Anthropic Claude SDK (structured output via tool_use)
+- **AI Text**: Google Gemini (`gemini-2.5-flash`, structured output via responseSchema)
 - **AI Bilder**: Google Gemini (`gemini-2.5-flash-image`)
 - **PDF**: Puppeteer (HTML → PDF)
 - **CLI**: Commander + Ora + Chalk
