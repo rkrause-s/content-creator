@@ -20,7 +20,9 @@ program
   .option("-l, --language <lang>", "Content language (de/en)", config.defaultLanguage)
   .option("-o, --output <dir>", "Output directory", "output")
   .option("--skip-images", "Skip image generation via Gemini")
-  .action(async (prompt: string, opts: { language: string; output: string; skipImages?: boolean }) => {
+  .option("--publish", "Publish blog/landing-page assets to GitHub content repo as PR")
+  .option("--repo <repo>", "GitHub repo for publishing (default: seibert-external/go.seibert.group)")
+  .action(async (prompt: string, opts: { language: string; output: string; skipImages?: boolean; publish?: boolean; repo?: string }) => {
     try {
       validateConfig();
       console.log(chalk.bold("\n🚀 Content Creator Pipeline\n"));
@@ -28,13 +30,19 @@ program
         language: opts.language,
         outputDir: opts.output,
         skipImages: opts.skipImages,
+        publish: opts.publish,
+        publishRepo: opts.repo,
       });
       console.log(
         chalk.green(
           `\n✅ Campaign "${state.plan?.campaignName}" generated successfully!`
         )
       );
-      console.log(`   Open ${chalk.underline(state.outputDir + "/preview/index.html")} to preview.\n`);
+      console.log(`   Open ${chalk.underline(state.outputDir + "/preview/index.html")} to preview.`);
+      if (state.publishResult?.prUrl) {
+        console.log(`   PR: ${chalk.underline(state.publishResult.prUrl)}`);
+      }
+      console.log();
     } catch (err) {
       console.error(chalk.red(`\n❌ Error: ${(err as Error).message}\n`));
       process.exit(1);

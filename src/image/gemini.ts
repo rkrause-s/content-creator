@@ -74,6 +74,8 @@ export function buildImagePrompt(options: {
       "Create a visually striking Instagram post image. Modern, vibrant design suitable for a tech company. No text in the image. Square format.",
     whitepaper:
       "Create a professional whitepaper cover design. Elegant, authoritative, business-appropriate. Abstract tech/data visualization elements. No text in the image. A4 portrait format.",
+    "landing-page":
+      "Create a modern, conversion-focused hero image for a landing page. Clean, bold design with abstract shapes or subtle tech imagery. No text in the image. 16:9 aspect ratio.",
   };
 
   const style = styleMap[options.assetType] ?? styleMap["blog-article"];

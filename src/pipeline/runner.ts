@@ -8,6 +8,7 @@ import { reviewAssets } from "./stages/review.js";
 import { exportCampaign } from "./stages/export.js";
 import { generateImages } from "./stages/generate-images.js";
 import { generatePdfs } from "./stages/generate-pdfs.js";
+import { publishToRepo, type PublishOptions, type PublishResult } from "./stages/publish-to-repo.js";
 import { loadBrandConfig } from "../brand/loader.js";
 
 export interface RunOptions {
@@ -15,6 +16,10 @@ export interface RunOptions {
   outputDir?: string;
   planOnly?: boolean;
   skipImages?: boolean;
+  /** Publish blog-article/landing-page assets to a GitHub content repo */
+  publish?: boolean;
+  /** GitHub repo for publishing (default: seibert-external/go.seibert.group) */
+  publishRepo?: string;
 }
 
 export async function runPipeline(userPrompt: string, options: RunOptions): Promise<PipelineState> {
@@ -125,6 +130,28 @@ export async function runPipeline(userPrompt: string, options: RunOptions): Prom
   if (state.assets.some((a) => a.imagePath || a.pdfPath)) {
     const { exportHtmlPreview } = await import("../export/html-preview.js");
     await exportHtmlPreview(state.outputDir!, state);
+  }
+
+  // Stage 8: Publish to GitHub repo (blog-article, landing-page)
+  if (options.publish) {
+    const publishable = state.assets.filter((a) => ["blog-article", "landing-page"].includes(a.type));
+    if (publishable.length > 0) {
+      spinner = ora(`Publishing ${publishable.length} page(s) to GitHub...`).start();
+      try {
+        const result = await publishToRepo(state.assets, state.plan!.campaignName, {
+          repo: options.publishRepo,
+          createPr: true,
+        });
+        state.publishResult = result;
+        if (result.prUrl) {
+          spinner.succeed(`PR created: ${chalk.underline(result.prUrl)}`);
+        } else {
+          spinner.succeed(`${result.published.length} page(s) pushed to ${result.repo}:${result.branch}`);
+        }
+      } catch (err) {
+        spinner.fail(`Publishing failed: ${(err as Error).message}`);
+      }
+    }
   }
 
   return state;

@@ -9,6 +9,7 @@ export const AssetTypeEnum = z.enum([
   "email-newsletter",
   "instagram-caption",
   "whitepaper",
+  "landing-page",
 ]);
 
 export type AssetType = z.infer<typeof AssetTypeEnum>;
@@ -104,4 +105,10 @@ export interface PipelineState {
   assets?: GeneratedAsset[];
   review?: ReviewResult;
   outputDir?: string;
+  publishResult?: {
+    published: { assetId: string; filePath: string; url: string }[];
+    prUrl?: string;
+    branch: string;
+    repo: string;
+  };
 }
